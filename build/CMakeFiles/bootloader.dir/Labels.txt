@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/CMakeFiles/bootloader
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/CMakeFiles/bootloader.rule
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/CMakeFiles/bootloader-complete.rule
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
