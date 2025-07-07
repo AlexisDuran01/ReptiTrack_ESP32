@@ -250,6 +250,16 @@ static void prov_event_handler(void* arg, esp_event_base_t event_base, int32_t e
     }
 }
 
+
+void print_current_wifi_info(void) {
+    wifi_config_t wifi_config;
+    if (esp_wifi_get_config(WIFI_IF_STA, &wifi_config) == ESP_OK) {
+        ESP_LOGI(TAG, "Ya estas conectado a la red: %s", (char *)wifi_config.sta.ssid);
+    } else {
+        ESP_LOGW(TAG, "No se pudo obtener la configuracion Wi-Fi");
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Función principal que inicia todo el proceso de provisionamiento Wi-Fi
 void my_wifi_prov_startup(void)
@@ -280,6 +290,7 @@ void my_wifi_prov_startup(void)
     if (provisioned) {
         led_blink = false; // Si ya está configurado, el LED queda fijo encendido
         // El sistema sigue funcionando normalmente, la tarea reprov_button_task se encarga del reprovisionamiento si el usuario lo solicita
+	     print_current_wifi_info(); // funcion para mostrar a que red esta conectado el dispositivo
     } else {
         led_blink = true; // Si NO está configurado, el LED parpadea indicando que está esperando ser provisionado
 

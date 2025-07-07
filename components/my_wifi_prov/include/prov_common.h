@@ -48,3 +48,7 @@ void my_wifi_prov_print_qr(const char *service_name, const char *username, const
 // Se encarga de iniciar la espera de datos, manejar los eventos y coordinar el flujo completo para conectar el dispositivo a la red
 // Se recomienda llamarla desde el archivo principal del programa (app_main.c) para que el dispositivo pueda conectarse a internet de forma sencilla
 void my_wifi_prov_startup(void);
+
+// Funcion que imprime cuales son las credenciales de internet guardardas en la memoria no volatil  (Non-Volatile Storage) 
+void print_current_wifi_info(void);
+	
