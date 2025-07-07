@@ -26,6 +26,8 @@
 #include "nvs_flash.h"                            // Permite guardar y borrar datos en la memoria interna
 #include "sec2_params.h"                          // Incluye los datos de seguridad para el provisionamiento
 #include "pin_config_wifi.h"                      // Define qué pines se usan para el LED y el botón
+#include <string.h>                               // Para strlen, strcpy, strcmp, etc.
+
 
 static const char *TAG = "wifi_prov";             // Etiqueta para los mensajes en consola
 
@@ -33,8 +35,11 @@ static TaskHandle_t led_task_handle = NULL;       // Identificador de la tarea d
 static bool led_blink = false;                    // Indica si el LED debe parpadear o quedarse fijo
 static bool provisioned_global = false;           // Indica si el dispositivo ya está configurado
 
+// Indica a la aplicacion movil que debe usar Bluetooth Low Energy (BLE) para comunicarse con el ESP32.
+#define PROV_TRANSPORT_BLE      "ble"			  
+
 #define EXAMPLE_PROV_SEC2_USERNAME          "reptitrack"
-//#define EXAMPLE_PROV_SEC2_PWD               "xp4tzq7" // (opcional) Contraseña para el provisionamiento
+#define EXAMPLE_PROV_SEC2_PWD               "xp4tzq7" // Contraseña para el provisionamiento
 
 // -----------------------------------------------------------------------------
 // Inicializa los GPIOs para el LED y el botón de reprovisionamiento
@@ -170,21 +175,40 @@ void my_wifi_prov_mgr_deinit(void)
  */
 void my_wifi_prov_print_qr(const char *service_name, const char *username, const char *pop, const char *transport)
 {
-    ESP_LOGI(TAG, "Imprimiendo QR para provision");
+    ESP_LOGI(TAG, "Generado codigo QR para provisionamiento...");
 
-    char payload[256]; // Buffer para el JSON del QR
-#if CONFIG_EXAMPLE_PROV_SECURITY_VERSION_2
-    snprintf(payload, sizeof(payload),
-             "{\"ver\":\"v1\",\"name\":\"%s\",\"username\":\"%s\",\"pop\":\"%s\",\"transport\":\"%s\"}",
-             service_name, username, pop, transport);
-#else
-    snprintf(payload, sizeof(payload),
-             "{\"ver\":\"v1\",\"name\":\"%s\",\"pop\":\"%s\",\"transport\":\"%s\"}",
-             service_name, pop, transport);
+    // Validación de parámetros obligatorios - evita crashes si faltan datos críticos
+    if (!service_name || !transport) {
+        ESP_LOGW(TAG, "No se puede generar el código QR. Faltan datos obligatorios.");
+        return; // Sale de la función sin hacer nada si faltan parámetros
+    }
+
+    char payload[200] = {0}; // Buffer para almacenar el JSON del código QR (inicializado en ceros)
+    
+    // Lógica condicional: genera diferentes formatos de JSON según si hay contraseña o no
+    if (pop && strlen(pop) > 0) { // Si hay contraseña definida y no está vacía
+#if CONFIG_EXAMPLE_PROV_SECURITY_VERSION_2 // Para Security 2 (SRP6a) incluye username
+        snprintf(payload, sizeof(payload),
+                 "{\"ver\":\"v1\",\"name\":\"%s\",\"username\":\"%s\",\"pop\":\"%s\",\"transport\":\"%s\"}",
+                 service_name, username ? username : "reptitrack", pop, transport);
+#else // Para Security 1 no incluye username
+        snprintf(payload, sizeof(payload),
+                 "{\"ver\":\"v1\",\"name\":\"%s\",\"pop\":\"%s\",\"transport\":\"%s\"}",
+                 service_name, pop, transport);
 #endif
+    } else {
+        // Para SRP6a sin contraseña - solo incluye nombre, usuario y transporte
+        // El campo "pop" se omite completamente porque SRP6a usa verificadores criptográficos
+        snprintf(payload, sizeof(payload),
+                 "{\"ver\":\"v1\",\"name\":\"%s\",\"username\":\"%s\",\"transport\":\"%s\"}",
+                 service_name, username ? username : "reptitrack", transport);
+    }
 
-    printf("Escanea este codigo QR en la app de provision:\n\n");
-    printf("https://espressif.github.io/esp-jumpstart/qrcode.html?data=%s\n\n", payload);
+    // Logs informativos para depuración
+    ESP_LOGI(TAG, "Datos del QR generados: %s", payload);
+    // Imprime el enlace 
+    ESP_LOGI(TAG, "Si el codigo QR no es visible, copia y pega esta URL en un navegador:");
+   	ESP_LOGI(TAG, "https://espressif.github.io/esp-jumpstart/qrcode.html?data=%s\n\n", payload);
 }
 
 // -----------------------------------------------------------------------------
@@ -315,9 +339,11 @@ void my_wifi_prov_startup(void)
             service_name, NULL)); 
         ESP_LOGI(TAG, "Provisioning BLE iniciado (nombre: %s)", service_name); // Muestra en consola que el provisioning BLE ha comenzado.
 
-
-        //my_wifi_prov_print_qr(service_name, username, NULL, "ble"); 
-        // (Opcional) Imprime en consola el QR para que la app móvil pueda escanearlo y conectarse fácilmente al dispositivo.
+		const char *username  = EXAMPLE_PROV_SEC2_USERNAME;
+		const char *password = EXAMPLE_PROV_SEC2_PWD; 
+        my_wifi_prov_print_qr(service_name, username, password,PROV_TRANSPORT_BLE); 
+        // Imprime en consola el QR para que la app móvil pueda escanearlo y conectarse fácilmente al dispositivo.
+        // Usa NULL en lugar de la contraseña porque el protocolo SRP6a usa el verificador (sec2_verifier) para mayor seguridad.
     }
 }
 

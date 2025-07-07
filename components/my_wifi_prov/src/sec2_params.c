@@ -7,7 +7,6 @@
 // Ambos valores deben ser diferentes para cada dispositivo para maximizar la seguridad.
 
 // Array que contiene el valor de "salt" (sal) utilizado en el protocolo SRP6a.
-// Este valor fue generado durante la configuración inicial del dispositivo.
 const char sec2_salt[] = {
    0x0f, 0xea, 0xbb, 0xcf, 0x6f, 0xbd, 0x0f, 0x91, 0x56, 0xa5, 0x29, 0x7d, 0x83, 0xc7, 0x28, 0x0b
 };
