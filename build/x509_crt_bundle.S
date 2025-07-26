@@ -1,4 +1,4 @@
-/* * Data converted from D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 #if !defined (__APPLE__) && !defined (__linux__)

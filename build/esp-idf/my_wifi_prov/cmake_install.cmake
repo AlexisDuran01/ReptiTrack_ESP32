@@ -1,4 +1,4 @@
-# Install script for directory: D:/Universidad/9-Cuatrimestre/Proyecto/ESP32/components/my_wifi_prov
+# Install script for directory: D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/my_wifi_prov
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

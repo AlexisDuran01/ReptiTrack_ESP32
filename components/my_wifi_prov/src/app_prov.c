@@ -27,6 +27,7 @@
 #include "sec2_params.h"                          // Incluye los datos de seguridad para el provisionamiento
 #include "pin_config_wifi.h"                      // Define qué pines se usan para el LED y el botón
 #include <string.h>                               // Para strlen, strcpy, strcmp, etc.
+#include "cJSON.h"  // Librería para parsear (deserializar) y generar (serializar) datos en formato JSON, útil para interpretar comandos o enviar información estructurada (por ejemplo, en mensajes MQTT).
 
 
 static const char *TAG = "wifi_prov";             // Etiqueta para los mensajes en consola
@@ -211,6 +212,8 @@ void my_wifi_prov_print_qr(const char *service_name, const char *username, const
    	ESP_LOGI(TAG, "https://espressif.github.io/esp-jumpstart/qrcode.html?data=%s\n\n", payload);
 }
 
+
+
 // -----------------------------------------------------------------------------
 // Inicializa los sistemas básicos del ESP32 (memoria, red, Wi-Fi)
 esp_err_t init_base_system(void)
@@ -240,6 +243,23 @@ esp_err_t init_base_system(void)
 
     return ESP_OK;
 }
+
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                              int32_t event_id, void* event_data)
+{
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t* disconn = (wifi_event_sta_disconnected_t*) event_data;
+        ESP_LOGI(TAG, "WiFi desconectado. Motivo: %d", disconn->reason);
+
+        if (disconn->reason == WIFI_REASON_NO_AP_FOUND || disconn->reason == WIFI_REASON_AUTH_FAIL) {
+            ESP_LOGE(TAG, "Fallo de conexión WiFi (reason %d). Borrando NVS y reiniciando para reprovisionar.", disconn->reason);
+            ESP_ERROR_CHECK(nvs_flash_erase());
+            esp_restart();
+        }
+    }
+}
+
+
 
 // -----------------------------------------------------------------------------
 // Handler de eventos del proceso de provisioning
@@ -284,6 +304,263 @@ void print_current_wifi_info(void) {
     }
 }
 
+// =============================================================================
+// Handlers para Endpoints Personalizados
+// =============================================================================
+
+/**
+
+ * @brief Manejador para procesar la configuración de base de datos (db-config) recibida vía protocolo personalizado.
+ 	brief: Es un tag que se usa para indicar una descripción de una función, variable o módulo, lo utilizan herramientas
+ 	de documentación automática
+ 
+ * Este handler es llamado por el servidor de aprovisionamiento (prov) cuando se recibe un mensaje del tipo "db-config".
+ * Extrae los campos `userId` y `espId` desde un JSON recibido en el buffer `inbuf`, y responde con "OK_DB_CONFIG".
+ *
+ * @param session_id ID de sesión actual (proporcionado por el servidor de aprovisionamiento)
+ * @param inbuf      Buffer de entrada que contiene los datos recibidos (JSON)
+ * @param inlen      Longitud de los datos en el buffer `inbuf`
+ * @param outbuf     Puntero al buffer de salida que se enviará como respuesta
+ * @param outlen     Longitud del buffer de salida
+ * @param priv_data  Datos privados opcionales, no utilizados aquí
+ *
+ * @return ESP_OK en caso de éxito, o código de error de tipo esp_err_t
+ */
+static esp_err_t db_config_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
+                                   uint8_t **outbuf, ssize_t *outlen, void *priv_data)
+{
+    // Imprime información de depuración sobre la sesión y longitud de datos recibidos
+    ESP_LOGI(TAG, "db-config handler recibido. Sesion ID: %" PRIu32 ", Longitud de datos: %zd", session_id, inlen);
+
+    // Verifica que se hayan recibido datos válidos
+    if (inbuf && inlen > 0) {
+        // Reserva memoria para copiar los datos como cadena terminada en '\0' (necesaria para cJSON)
+        char *json_str = (char *)malloc(inlen + 1);
+        if (!json_str) {
+            // Error de memoria al asignar buffer para el JSON
+            ESP_LOGE(TAG, "Error: No hay memoria para json_str.");
+            *outbuf = NULL;
+            *outlen = 0;
+            return ESP_ERR_NO_MEM;
+        }
+
+        // Copia los datos del buffer recibido y agrega terminador nulo
+        memcpy(json_str, inbuf, inlen);
+        json_str[inlen] = '\0';
+
+        // Parsea el JSON recibido en un objeto cJSON
+        cJSON *root = cJSON_Parse(json_str);
+        if (root == NULL) {
+            // Error al interpretar el JSON (formato inválido)
+            ESP_LOGE(TAG, "Error al parsear JSON en db-config");
+            free(json_str);
+            *outbuf = NULL;
+            *outlen = 0;
+            return ESP_FAIL;
+        }
+
+        // Extrae el campo "userId" del JSON (esperado como cadena)
+        cJSON *userId = cJSON_GetObjectItem(root, "userId");
+
+        // Extrae el campo "espId" del JSON (esperado como cadena)
+        cJSON *espId = cJSON_GetObjectItem(root, "espId");  // <-- NUEVO campo opcional para identificar el dispositivo
+
+        // Verifica que userId exista y sea una cadena válida
+        if (userId && cJSON_IsString(userId)) {
+            ESP_LOGI(TAG, "User ID recibido: %s", userId->valuestring);
+            // Aquí puedes guardar el userId en NVS o usarlo según tu lógica
+        } else {
+            ESP_LOGW(TAG, "User ID no recibido o inválido");
+        }
+
+        // Verifica que espId exista y sea una cadena válida
+        if (espId && cJSON_IsString(espId)) {
+            ESP_LOGI(TAG, "ESP ID recibido: %s", espId->valuestring);
+            // Aquí también puedes guardar el espId si lo necesitas para MQTT u otra configuración
+        } else {
+            ESP_LOGW(TAG, "ESP ID no recibido o inválido");  
+        }
+
+        // Libera la memoria del JSON y el buffer temporal
+        cJSON_Delete(root);
+        free(json_str);
+    } else {
+        // Si no se recibió información en el buffer
+        ESP_LOGW(TAG, "db-config handler recibido sin datos");
+    }
+
+    // Prepara una respuesta simple para confirmar recepción y parseo exitoso
+    const char *response_str = "OK_DB_CONFIG";
+    size_t response_len = strlen(response_str) + 1;  // +1 para incluir el terminador nulo
+
+    // Asigna memoria para el buffer de salida
+    *outbuf = (uint8_t *)malloc(response_len);
+    if (*outbuf == NULL) {
+        // Error al asignar memoria para respuesta
+        ESP_LOGE(TAG, "Error de memoria al asignar outbuf para db-config");
+        *outlen = 0;
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Copia la cadena de respuesta al buffer de salida
+    memcpy(*outbuf, response_str, response_len);
+    *outlen = response_len;
+
+    // Devuelve ESP_OK para indicar éxito
+    return ESP_OK;
+}
+
+
+/**
+ * @brief Handler para procesar la configuración MQTT recibida en formato JSON.
+ *
+ * Esta función es llamada cuando se recibe un mensaje tipo "mqtt-config" desde el servidor de aprovisionamiento.
+ * Extrae la URI del broker, username y password desde el JSON recibido, los muestra por log
+ * y responde con un mensaje de confirmación.
+ *
+ * @param session_id ID de sesión de la comunicación actual (identificador único de sesión)
+ * @param inbuf      Puntero al buffer de entrada que contiene los datos recibidos (en este caso un JSON)
+ * @param inlen      Tamaño en bytes de los datos recibidos en inbuf
+ * @param outbuf     Dirección del puntero que apuntará al buffer de salida para enviar respuesta
+ * @param outlen     Dirección donde se almacenará la longitud del buffer de salida
+ * @param priv_data  Puntero a datos privados (opcional y no usado en este handler)
+ *
+ * @return ESP_OK si el procesamiento fue exitoso, o un código de error esp_err_t en caso contrario
+ */
+static esp_err_t mqtt_config_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
+                                     uint8_t **outbuf, ssize_t *outlen, void *priv_data)
+{
+    // static: función con visibilidad solo dentro del archivo (scope interno)
+    // esp_err_t: tipo de dato que representa códigos de error o éxito en ESP-IDF (int)
+    // session_id: identificador numérico único para la sesión de aprovisionamiento
+    // inbuf: buffer de datos recibidos (puntero constante a bytes)
+    // inlen: tamaño del buffer inbuf
+    // outbuf: puntero para asignar la respuesta que se enviará (puntero doble)
+    // outlen: puntero para indicar el tamaño de la respuesta asignada
+    // priv_data: datos adicionales, no usados aquí
+
+    // Log informativo con el ID de sesión y tamaño de datos recibidos
+    ESP_LOGI(TAG, "mqtt-config handler recibido. Sesion ID: %" PRIu32 ", Longitud de datos: %zd", session_id, inlen);
+
+    // Verifica que se recibieron datos válidos (buffer no nulo y tamaño positivo)
+    if (inbuf && inlen > 0) {
+        // Reserva memoria dinámica para copiar los datos recibidos y agregar un terminador nulo '\0'
+        // necesario para interpretar el buffer como una cadena de texto (string)
+        char *json_str = (char *)malloc(inlen + 1);
+        if (!json_str) {
+            // Si no hay memoria suficiente, registra error y retorna código de error ESP_ERR_NO_MEM
+            ESP_LOGE(TAG, "Error: No hay memoria para json_str.");
+            *outbuf = NULL;  // No hay respuesta para enviar
+            *outlen = 0;     // Longitud 0
+            return ESP_ERR_NO_MEM;
+        }
+
+        // Copia el contenido de inbuf al buffer json_str
+        memcpy(json_str, inbuf, inlen);
+
+        // Añade el caracter nulo para terminar la cadena
+        json_str[inlen] = '\0';
+
+        // Parsea la cadena JSON con la librería cJSON, creando un árbol de objetos JSON
+        cJSON *root = cJSON_Parse(json_str);
+        if (root == NULL) {
+            // Si no pudo parsear (JSON inválido), reporta error y limpia memoria
+            ESP_LOGE(TAG, "Error al parsear JSON mqtt-config");
+            free(json_str);
+            *outbuf = NULL;
+            *outlen = 0;
+            return ESP_FAIL;  // Código genérico de fallo
+        }
+
+        // Extrae del JSON el campo "broker" (la URI del servidor MQTT)
+        cJSON *broker = cJSON_GetObjectItem(root, "broker");
+
+        // Extrae el campo "username" para la autenticación MQTT
+        cJSON *username = cJSON_GetObjectItem(root, "username");
+
+        // Extrae el campo "password" para la autenticación MQTT
+        cJSON *password = cJSON_GetObjectItem(root, "password");
+
+        // Verifica que el campo broker exista y sea una cadena válida
+        if (broker && cJSON_IsString(broker)) {
+            ESP_LOGI(TAG, "Broker URI: %s", broker->valuestring);
+            // Aquí podrías guardar el broker en NVS o usarlo para configurar el cliente MQTT
+        } else {
+            ESP_LOGW(TAG, "Broker URI no recibido o inválido");
+        }
+
+        // Verifica que el campo username exista y sea cadena válida
+        if (username && cJSON_IsString(username)) {
+            ESP_LOGI(TAG, "MQTT Username: %s", username->valuestring);
+            // Aquí podrías guardar username en NVS para uso posterior
+        } else {
+            ESP_LOGW(TAG, "MQTT Username no recibido o inválido");
+        }
+
+        // Verifica que el campo password exista y sea cadena válida
+        if (password && cJSON_IsString(password)) {
+            ESP_LOGI(TAG, "MQTT Password: %s", password->valuestring);
+            // Podrías guardar password de forma segura en NVS o usarlo para conectar
+        } else {
+            ESP_LOGW(TAG, "MQTT Password no recibido o inválido");
+        }
+
+        // Libera el árbol JSON para evitar fugas de memoria
+        cJSON_Delete(root);
+
+        // Libera el buffer temporal de la cadena JSON
+        free(json_str);
+    } else {
+        // Si no se recibieron datos, muestra una advertencia en el log
+        ESP_LOGW(TAG, "mqtt-config handler recibido sin datos");
+    }
+
+    // Prepara una cadena de respuesta para confirmar la recepción exitosa del mensaje
+    const char *response_str = "OK_MQTT_CONFIG";
+
+    // Calcula la longitud de la respuesta incluyendo el terminador nulo
+    size_t response_len = strlen(response_str) + 1;
+
+    // Reserva memoria para el buffer de salida (respuesta)
+    *outbuf = (uint8_t *)malloc(response_len);
+    if (*outbuf == NULL) {
+        // Error si no pudo asignar memoria para la respuesta
+        ESP_LOGE(TAG, "Error de memoria al asignar respuesta mqtt-config");
+        *outlen = 0;
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Copia la respuesta al buffer de salida
+    memcpy(*outbuf, response_str, response_len);
+
+    // Establece la longitud del buffer de salida
+    *outlen = response_len;
+
+    // Retorna ESP_OK para indicar que el handler ejecutó correctamente
+    return ESP_OK;
+}
+
+
+static esp_err_t ping_conn_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
+                                   uint8_t **outbuf, ssize_t *outlen, void *priv_data)
+{
+    ESP_LOGI(TAG, "Ping recibido en el endpoint 'ping-conn'. Sesion ID: %" PRIu32, session_id);
+
+    const char *response_str = "PONG";
+    size_t response_len = strlen(response_str) + 1;
+
+    *outbuf = (uint8_t *)malloc(response_len);
+    if (*outbuf == NULL) {
+        *outlen = 0;
+        return ESP_ERR_NO_MEM;
+    }
+    memcpy(*outbuf, response_str, response_len);
+    *outlen = response_len;
+    return ESP_OK;
+}
+
+
+
 // -----------------------------------------------------------------------------
 // Función principal que inicia todo el proceso de provisionamiento Wi-Fi
 void my_wifi_prov_startup(void)
@@ -305,6 +582,12 @@ void my_wifi_prov_startup(void)
         WIFI_PROV_EVENT, ESP_EVENT_ANY_ID,
         prov_event_handler, NULL)); 
     // Registra la función que manejará los eventos del proceso de provisionamiento (inicio, éxito, fallo, fin)
+    
+        // REGISTRA EL HANDLER DE EVENTOS WIFI
+    ESP_ERROR_CHECK(esp_event_handler_register(
+        WIFI_EVENT, ESP_EVENT_ANY_ID,
+        wifi_event_handler, NULL));
+
 
     bool provisioned = false; // Variable para saber si el dispositivo ya fue configurado anteriormente
     ESP_ERROR_CHECK(wifi_prov_mgr_is_provisioned(&provisioned)); // Consulta al manager de provisioning si el dispositivo ya tiene credenciales Wi-Fi guardadas
@@ -322,6 +605,20 @@ void my_wifi_prov_startup(void)
         // Inicializa el manager de provisioning con el esquema seleccionado (BLE o SoftAP).
         ESP_LOGI(TAG, "Manager de provisioning inicializado");
         // Muestra en consola que el manager de provisioning está listo.
+        
+		// Crea el endpoint (punto de conexión) para recibir configuración de la base de datos
+		// Este endpoint escuchará mensajes tipo "db-config" y llamará al handler asociado
+		wifi_prov_mgr_endpoint_create("db-config");
+		
+		// Crea el endpoint para recibir configuración MQTT
+		// Este endpoint escuchará mensajes tipo "mqtt-config" y llamará al handler correspondiente
+		wifi_prov_mgr_endpoint_create("mqtt-config");
+		
+		// Crea el endpoint para manejar mensajes de ping de conexión
+		// Útil para comprobar que el dispositivo sigue conectado y responde
+		wifi_prov_mgr_endpoint_create("ping-conn");
+
+        ESP_LOGI(TAG, "Endpoints personalizados 'db-config','mqtt-config' y ping-conn creados.");
 
         wifi_prov_security2_params_t sec2_params = { // Estructura con los parámetros de seguridad para el esquema SRP6a (Security 2)
             .salt = sec2_salt,                      // Salt único para este dispositivo (protege la contraseña)
@@ -339,9 +636,26 @@ void my_wifi_prov_startup(void)
             service_name, NULL)); 
         ESP_LOGI(TAG, "Provisioning BLE iniciado (nombre: %s)", service_name); // Muestra en consola que el provisioning BLE ha comenzado.
 
-		const char *username  = EXAMPLE_PROV_SEC2_USERNAME;
-		const char *password = EXAMPLE_PROV_SEC2_PWD; 
-        my_wifi_prov_print_qr(service_name, username, password,PROV_TRANSPORT_BLE); 
+		
+        // --- INICIO: Agrega este bloque para registrar los handlers ---
+        // Los handlers se registran *después* de my_wifi_prov_mgr_start()
+        ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_register("db-config", db_config_handler, NULL));
+        ESP_LOGI(TAG, "Handler para 'db-config' registrado.");
+
+        ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_register("mqtt-config", mqtt_config_handler, NULL));
+        ESP_LOGI(TAG, "Handler para 'mqtt-config' registrado.");
+        
+        ESP_ERROR_CHECK( wifi_prov_mgr_endpoint_register("ping-conn", ping_conn_handler, NULL));
+        ESP_LOGI(TAG, "Handler para 'ping-conn' registrado.");
+
+        
+        
+        // --- FIN: Agrega este bloque ---
+		
+
+		//const char *username  = EXAMPLE_PROV_SEC2_USERNAME;
+		//const char *password = EXAMPLE_PROV_SEC2_PWD; 
+      	//  my_wifi_prov_print_qr(service_name, username, password,PROV_TRANSPORT_BLE); 
         // Imprime en consola el QR para que la app móvil pueda escanearlo y conectarse fácilmente al dispositivo.
         // Usa NULL en lugar de la contraseña porque el protocolo SRP6a usa el verificador (sec2_verifier) para mayor seguridad.
     }
