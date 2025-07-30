@@ -8,6 +8,12 @@
 #include "prov_common.h" // Incluye el archivo que tiene la función para iniciar la conexión Wi-Fi
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "esp_log.h"
+#include <dht.h>
+
+
+//static const char *TAG = "app_main";
+
 
 // Esta es la función principal que se ejecuta al encender el esp32
 void app_main(void)

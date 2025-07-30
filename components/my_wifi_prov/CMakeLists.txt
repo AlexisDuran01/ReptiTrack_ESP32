@@ -10,4 +10,10 @@ idf_component_register(
     wifi_provisioning
     driver
     json
+    network_utils
+    rtc_time
+    esp_phy
+    nvs_utils
+    conn_manager
+    mqtt_cliente
 )

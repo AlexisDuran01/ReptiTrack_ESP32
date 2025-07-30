@@ -28,7 +28,10 @@
 #include "pin_config_wifi.h"                      // Define qué pines se usan para el LED y el botón
 #include <string.h>                               // Para strlen, strcpy, strcmp, etc.
 #include "cJSON.h"  // Librería para parsear (deserializar) y generar (serializar) datos en formato JSON, útil para interpretar comandos o enviar información estructurada (por ejemplo, en mensajes MQTT).
-
+#include "esp_netif.h"
+#include "nvs_utils.h"               
+#include "conn_manager.h"               
+#include "mqtt_cliente.h"
 
 static const char *TAG = "wifi_prov";             // Etiqueta para los mensajes en consola
 
@@ -41,6 +44,11 @@ static bool provisioned_global = false;           // Indica si el dispositivo ya
 
 #define EXAMPLE_PROV_SEC2_USERNAME          "reptitrack"
 #define EXAMPLE_PROV_SEC2_PWD               "xp4tzq7" // Contraseña para el provisionamiento
+
+#define WIFI_MAXIMUM_RETRY  5
+
+static int s_retry_num = 0;
+
 
 // -----------------------------------------------------------------------------
 // Inicializa los GPIOs para el LED y el botón de reprovisionamiento
@@ -109,7 +117,7 @@ static bool wait_button_3s(void) {
 static void reprov_button_task(void *pvParameter) {
     while (1) {                                   // Bucle infinito
         if (wait_button_3s()) {                   // Si el botón se mantuvo presionado 3s
-            ESP_LOGI(TAG, "Botón presionado 3s. Borrando NVS y reiniciando para reprovisionar.");
+            ESP_LOGI(TAG, "Boton presionado 3s. Borrando NVS y reiniciando para reprovisionar");
             vTaskDelay(pdMS_TO_TICKS(100));       // Espera un poco para evitar rebotes
             ESP_ERROR_CHECK(nvs_flash_erase());   // Borra la configuración guardada en la memoria no volátil
             esp_restart();                        // Reinicia el dispositivo para empezar de nuevo el proceso de conexión
@@ -213,6 +221,62 @@ void my_wifi_prov_print_qr(const char *service_name, const char *username, const
 }
 
 
+// Función manejadora de eventos del sistema relacionados con Wi-Fi 
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                               int32_t event_id, void* event_data)
+{
+		// Este código se ejecuta cuando el sistema Wi-Fi indica que la interfaz Wi-Fi
+		// en modo estación (Station-STA) ha arrancado.
+		//
+		// La "interfaz" es la parte física (el chip o módulo Wi-Fi) junto con el software 
+		//que lo controla, que permite conectarse a una red Wi-Fi
+		
+		// Modo estación (STA) significa que el ESP32 se comporta como cliente,
+		// intentando conectarse a un router o punto de acceso Wi-Fi
+		//
+		// Cuando se recibe este evento, el ESP32 intenta conectarse automáticamente
+		// a la red Wi-Fi configurada previamente con esp_wifi_connect()
+		//
+		if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+			
+		esp_wifi_connect();  // Inicia el proceso de conexión a la red Wi-Fi configurada previamente
+		// Este método hace lo siguiente:
+		// - Utiliza las credenciales (SSID y contraseña) que ya fueron configuradas y almacenadas en NVS.
+		// - Inicia la búsqueda y negociación con el punto de acceso Wi-Fi (router).
+		// - Gestiona el protocolo de autenticación y asociación con el router.
+		// - Si la conexión es exitosa, el ESP32 recibirá una dirección IP (usualmente vía DHCP) y se disparará el evento IP_EVENT_STA_GOT_IP.
+		
+		// Se imprime un mensaje para informar del proceso
+		    ESP_LOGI(TAG, "Wi-Fi STA iniciado, intentando conectar..."); 
+		}
+
+    // Si el evento es una desconexión de la red Wi-Fi...
+    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        if (s_retry_num < WIFI_MAXIMUM_RETRY) {  // Si no hemos alcanzado el número máximo de reintentos
+            esp_wifi_connect();  // Intentamos reconectar
+            s_retry_num++;  // Aumentamos el contador de reintentos
+            ESP_LOGI(TAG, "Reintentando conexion Wi-Fi (%d/%d)", s_retry_num, WIFI_MAXIMUM_RETRY);  // Log informativo
+        } else {  // Si ya se alcanzó el límite de reintentos
+            ESP_LOGE(TAG, "No se pudo conectar despues de %d intentos", WIFI_MAXIMUM_RETRY);  // Log de error
+            vTaskDelay(pdMS_TO_TICKS(1000));  // Esperamos 1 segundo antes de reiniciar
+            ESP_ERROR_CHECK(nvs_flash_erase());  // Borramos la NVS para limpiar credenciales guardadas
+            esp_restart();  // Reiniciamos el dispositivo para forzar reprovisionamiento 
+        }
+    }
+
+    // Si el evento es que se obtuvo una IP válida desde el router (evento DHCP exitoso)...
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;  // Extraemos la IP desde la estructura del evento
+        ESP_LOGI(TAG, "Conectado a la red Wi-Fi IP obtenida: " IPSTR, IP2STR(&event->ip_info.ip));  // Mostramos la IP obtenida
+        s_retry_num = 0;  // Reiniciamos el contador de reintentos ya que la conexión fue exitosa
+		
+		// Inicia el gestor de conectividad, que internamente verifica
+		//  y levanta todos los serviciones que necesita de internet
+		conn_manager_init();  
+    }
+}
+
+
 
 // -----------------------------------------------------------------------------
 // Inicializa los sistemas básicos del ESP32 (memoria, red, Wi-Fi)
@@ -231,34 +295,59 @@ esp_err_t init_base_system(void)
     ESP_ERROR_CHECK(esp_event_loop_create_default()); // Inicializa el loop de eventos
 
     ESP_LOGI(TAG, "Creando interfaz Wi-Fi STA");
+    /*
+	 * La "interfaz de red" (esp_netif) es la parte que conecta el Wi-Fi del ESP32
+	 * con el sistema que maneja el Internet (la pila TCP/IP)
+	 
+	 * Permite asignar direcciones IP, gestionar la configuración de red y enrutar los datos.
+	 * Sin esta interfaz, el ESP32 no podría comunicarse correctamente a nivel de red.
+	 */
+	 
+	 //Interfaz: Parte física/lógica que se conecta a la red	
     (void) esp_netif_create_default_wifi_sta();      // Crea la interfaz Wi-Fi en modo estación
 
+
     ESP_LOGI(TAG, "Inicializando driver Wi-Fi");
+    /*
+	 * El "driver de Wi-Fi" es el software que controla el hardware Wi-Fi del ESP32.
+	 * Se encarga de gestionar la conexión, autenticación, transmisión y recepción de datos,
+	 * así como la interacción con el sistema operativo y la pila de red.
+	 * Sin este driver, el microcontrolador no podría comunicarse con redes Wi-Fi.
+	 */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT(); // Configuración por defecto
+    
+    //Driver: Software que controla y gestiona la interfaz
+    //El driver usa a la interfaz
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));            // Inicializa el driver Wi-Fi
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA)); // Configura modo estación
+	
+	  // Registrar los manejadores (handler) antes de iniciar el Wi-Fi
+	    
+	 
+    // Registra el mismo handler para todos los eventos Wi-Fi (inicio, desconexión, etc.)
+    ESP_ERROR_CHECK(esp_event_handler_register(        // Verifica errores al registrar el handler
+        WIFI_EVENT,                                    // Tipo de evento base (relacionado con Wi-Fi)
+        ESP_EVENT_ANY_ID,                              // Se desea recibir cualquier tipo de evento Wi-Fi
+        wifi_event_handler,                            // Función que manejará todos esos eventos
+        NULL));                                        // Parámetro opcional (no se pasa nada extra)
+ 
+	    
+    // Registra el manejador para eventos IP: cuando el ESP32 obtiene una IP vía DHCP
+    ESP_ERROR_CHECK(esp_event_handler_register(        // Verifica errores al registrar el handler
+        IP_EVENT,                                      // Tipo de evento base (relacionado con IP)
+        IP_EVENT_STA_GOT_IP,                           // Evento específico: se obtuvo una IP del router
+        wifi_event_handler,                            // Función que manejará el evento
+        NULL));                                        // Parámetro opcional (no se pasa nada extra)
+
 
     ESP_LOGI(TAG, "Iniciando Wi-Fi");
-    ESP_ERROR_CHECK(esp_wifi_start());               // Inicia el Wi-Fi
+    
+	// El evento WIFI_EVENT_STA_START es generado cuando se llama a esta funcion
+	// indicando que el modo STA ha sido iniciado
+	ESP_ERROR_CHECK(esp_wifi_start());  // Inicia el driver Wi-Fi en modo estación (STA)
 
     return ESP_OK;
 }
-
-static void wifi_event_handler(void* arg, esp_event_base_t event_base,
-                              int32_t event_id, void* event_data)
-{
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        wifi_event_sta_disconnected_t* disconn = (wifi_event_sta_disconnected_t*) event_data;
-        ESP_LOGI(TAG, "WiFi desconectado. Motivo: %d", disconn->reason);
-
-        if (disconn->reason == WIFI_REASON_NO_AP_FOUND || disconn->reason == WIFI_REASON_AUTH_FAIL) {
-            ESP_LOGE(TAG, "Fallo de conexión WiFi (reason %d). Borrando NVS y reiniciando para reprovisionar.", disconn->reason);
-            ESP_ERROR_CHECK(nvs_flash_erase());
-            esp_restart();
-        }
-    }
-}
-
 
 
 // -----------------------------------------------------------------------------
@@ -273,7 +362,17 @@ static void prov_event_handler(void* arg, esp_event_base_t event_base, int32_t e
             break;
         case WIFI_PROV_CRED_RECV: {                  // Cuando se reciben credenciales Wi-Fi
             wifi_sta_config_t *cfg = (wifi_sta_config_t *)event_data;
+                
+		    //wifi_sta_config_t es una estructura (struct) definida en el SDK de ESP-IDF que
+		    // contiene la configuración para el modo estación (STA) de Wi-Fi
             ESP_LOGI(TAG, "Credenciales recibidas: SSID=%s", (char*)cfg->ssid);
+            
+            // En este punto se cargan las credenciales en el driver Wi-Fi para que el ESP32
+		    // las use para conectarse y luego las guarda en NVS y las configura automáticamente
+
+		    // una vez configuradas, puede llamar a esp_wifi_connect() para iniciar la conexión
+		    // a la red Wi-Fi con esos datos recibidos
+		    
             break;
         }
         case WIFI_PROV_CRED_SUCCESS:                 // Cuando el provisioning fue exitoso
@@ -291,16 +390,6 @@ static void prov_event_handler(void* arg, esp_event_base_t event_base, int32_t e
             break;
         default:
             break;
-    }
-}
-
-
-void print_current_wifi_info(void) {
-    wifi_config_t wifi_config;
-    if (esp_wifi_get_config(WIFI_IF_STA, &wifi_config) == ESP_OK) {
-        ESP_LOGI(TAG, "Ya estas conectado a la red: %s", (char *)wifi_config.sta.ssid);
-    } else {
-        ESP_LOGW(TAG, "No se pudo obtener la configuracion Wi-Fi");
     }
 }
 
@@ -379,6 +468,29 @@ static esp_err_t db_config_handler(uint32_t session_id, const uint8_t *inbuf, ss
             // Aquí también puedes guardar el espId si lo necesitas para MQTT u otra configuración
         } else {
             ESP_LOGW(TAG, "ESP ID no recibido o inválido");  
+        }
+        
+        
+        // Guardar userId en NVS bajo namespace "database" con key "user_id"
+        if (userId && cJSON_IsString(userId)) {
+            ESP_LOGI(TAG, "User ID recibido: %s", userId->valuestring);
+            esp_err_t err = nvs_utils_save_blob("database", "user_id", userId->valuestring, strlen(userId->valuestring) + 1);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Error guardando userId en NVS: %s", esp_err_to_name(err));
+            }
+        } else {
+            ESP_LOGW(TAG, "User ID no recibido o inválido");
+        }
+
+        // Guardar espId en NVS bajo namespace "dev_info" con key "esp_id"
+        if (espId && cJSON_IsString(espId)) {
+            ESP_LOGI(TAG, "ESP ID recibido: %s", espId->valuestring);
+            esp_err_t err = nvs_utils_save_blob("dev_info", "esp_id", espId->valuestring, strlen(espId->valuestring) + 1);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Error guardando espId en NVS: %s", esp_err_to_name(err));
+            }
+        } else {
+            ESP_LOGW(TAG, "ESP ID no recibido o inválido");
         }
 
         // Libera la memoria del JSON y el buffer temporal
@@ -480,11 +592,18 @@ static esp_err_t mqtt_config_handler(uint32_t session_id, const uint8_t *inbuf, 
 
         // Extrae el campo "password" para la autenticación MQTT
         cJSON *password = cJSON_GetObjectItem(root, "password");
+        
+        mqtt_credentials_t creds = {0};  // Estructura para guardar credenciales
+
 
         // Verifica que el campo broker exista y sea una cadena válida
         if (broker && cJSON_IsString(broker)) {
             ESP_LOGI(TAG, "Broker URI: %s", broker->valuestring);
-            // Aquí podrías guardar el broker en NVS o usarlo para configurar el cliente MQTT
+            
+            // Establecemos el valor del broker al objeto para despues guardarlo 
+		    strncpy(creds.broker, broker->valuestring, sizeof(creds.broker) - 1);
+		    creds.broker[sizeof(creds.broker) - 1] = '\0';  // Seguridad extra
+		    
         } else {
             ESP_LOGW(TAG, "Broker URI no recibido o inválido");
         }
@@ -492,7 +611,10 @@ static esp_err_t mqtt_config_handler(uint32_t session_id, const uint8_t *inbuf, 
         // Verifica que el campo username exista y sea cadena válida
         if (username && cJSON_IsString(username)) {
             ESP_LOGI(TAG, "MQTT Username: %s", username->valuestring);
-            // Aquí podrías guardar username en NVS para uso posterior
+            
+            // Establecemos el valor del username al objeto para despues guardarlo 
+		    strncpy(creds.username, username->valuestring, sizeof(creds.username) - 1);
+		    creds.username[sizeof(creds.username) - 1] = '\0';
         } else {
             ESP_LOGW(TAG, "MQTT Username no recibido o inválido");
         }
@@ -500,11 +622,29 @@ static esp_err_t mqtt_config_handler(uint32_t session_id, const uint8_t *inbuf, 
         // Verifica que el campo password exista y sea cadena válida
         if (password && cJSON_IsString(password)) {
             ESP_LOGI(TAG, "MQTT Password: %s", password->valuestring);
-            // Podrías guardar password de forma segura en NVS o usarlo para conectar
+            
+            // Establecemos el valor del password al objeto para despues guardarlo 
+		    strncpy(creds.password, password->valuestring, sizeof(creds.password) - 1);
+		    creds.password[sizeof(creds.password) - 1] = '\0';
+            
         } else {
             ESP_LOGW(TAG, "MQTT Password no recibido o inválido");
         }
-
+        
+         // Guardar las credenciales en NVS
+        ESP_LOGI(TAG, "Guardando credenciales MQTT: broker=%s, usuario=%s", creds.broker, creds.username);
+        esp_err_t err = mqtt_credentials_save(&creds);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Error guardando credenciales MQTT en NVS: %s", esp_err_to_name(err));
+            cJSON_Delete(root);
+            free(json_str);
+            *outbuf = NULL;
+            *outlen = 0;
+            return err;
+        } else {
+            ESP_LOGI(TAG, "Credenciales MQTT guardadas correctamente en NVS");
+        }
+        
         // Libera el árbol JSON para evitar fugas de memoria
         cJSON_Delete(root);
 
@@ -578,16 +718,14 @@ void my_wifi_prov_startup(void)
     ESP_LOGI(TAG, "Sistema base listo, iniciando provisionamiento");
     // Muestra en consola que la inicialización básica fue exitosa y se procederá al provisioning.
 
+	        
+
     ESP_ERROR_CHECK(esp_event_handler_register(
         WIFI_PROV_EVENT, ESP_EVENT_ANY_ID,
         prov_event_handler, NULL)); 
     // Registra la función que manejará los eventos del proceso de provisionamiento (inicio, éxito, fallo, fin)
     
-        // REGISTRA EL HANDLER DE EVENTOS WIFI
-    ESP_ERROR_CHECK(esp_event_handler_register(
-        WIFI_EVENT, ESP_EVENT_ANY_ID,
-        wifi_event_handler, NULL));
-
+  
 
     bool provisioned = false; // Variable para saber si el dispositivo ya fue configurado anteriormente
     ESP_ERROR_CHECK(wifi_prov_mgr_is_provisioned(&provisioned)); // Consulta al manager de provisioning si el dispositivo ya tiene credenciales Wi-Fi guardadas
@@ -597,8 +735,8 @@ void my_wifi_prov_startup(void)
     if (provisioned) {
         led_blink = false; // Si ya está configurado, el LED queda fijo encendido
         // El sistema sigue funcionando normalmente, la tarea reprov_button_task se encarga del reprovisionamiento si el usuario lo solicita
-	     print_current_wifi_info(); // funcion para mostrar a que red esta conectado el dispositivo
-    } else {
+   		
+   	} else {
         led_blink = true; // Si NO está configurado, el LED parpadea indicando que está esperando ser provisionado
 
         ESP_ERROR_CHECK(my_wifi_prov_mgr_init()); 
@@ -649,10 +787,8 @@ void my_wifi_prov_startup(void)
         ESP_LOGI(TAG, "Handler para 'ping-conn' registrado.");
 
         
-        
-        // --- FIN: Agrega este bloque ---
-		
-
+       // Codigo para generar el codigo QR
+       		
 		//const char *username  = EXAMPLE_PROV_SEC2_USERNAME;
 		//const char *password = EXAMPLE_PROV_SEC2_PWD; 
       	//  my_wifi_prov_print_qr(service_name, username, password,PROV_TRANSPORT_BLE); 

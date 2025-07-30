@@ -6,7 +6,8 @@
 // El "verifier" (verificador) es un valor criptográfico calculado a partir de la contraseña y el salt, que permite autenticar al usuario sin exponer la contraseña real.
 // Ambos valores deben ser diferentes para cada dispositivo para maximizar la seguridad.
 
-// Array que contiene el valor de "salt" (sal) utilizado en el protocolo SRP6a.
+// Array que contiene el valor de "salt" (sal) utilizado en el protocolo SRP6a
+//Valores hexadecimales
 const char sec2_salt[] = {
    0x0f, 0xea, 0xbb, 0xcf, 0x6f, 0xbd, 0x0f, 0x91, 0x56, 0xa5, 0x29, 0x7d, 0x83, 0xc7, 0x28, 0x0b
 };
@@ -17,6 +18,7 @@ const int sec2_salt_len = sizeof(sec2_salt);
 // Array que contiene el valor de "verifier" (verificador) generado para este dispositivo.
 // El verifier se calcula usando la contraseña del usuario y el salt, siguiendo el algoritmo SRP6a.
 // Este valor permite que el dispositivo autentique a la app sin almacenar ni transmitir la contraseña real.
+//Valores hexadecimales
 const char sec2_verifier[] = {
 0x33, 0xc9, 0x0b, 0x14, 0x62, 0x40, 0x55, 0xa3, 0xa0, 0x46, 0x15, 0x6d, 0x7f, 0xd9, 0x1d, 0x34, 
 0x86, 0x14, 0x6d, 0xb8, 0x62, 0x7b, 0x96, 0x78, 0xce, 0x73, 0x31, 0xb7, 0x2e, 0x27, 0xc4, 0x97, 
