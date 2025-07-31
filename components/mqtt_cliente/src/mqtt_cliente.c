@@ -149,7 +149,7 @@ void publish_estado_conectado(void) {
     }
 
     // Publicar al tópico "estatus"
-    bool publicado = mqtt_cliente_publish_with_base("estatus", json_payload, 1, false);
+    bool publicado = mqtt_cliente_publish_with_base("estatus", json_payload, 0, false);
     if (!publicado) {
         ESP_LOGW(TAG, "No se pudo publicar estado conectado");
     } else {

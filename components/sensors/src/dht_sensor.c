@@ -25,7 +25,7 @@ static bool dht_sensor_init(Sensor* self) {
 static void* dht_sensor_read(Sensor* self) {
     if (!self) return NULL;
 
-    DHT11Data* data = (DHT11Data*)self->internal_data;
+    DHTSensorData* data = (DHTSensorData*)self->internal_data;
     if (!data) return NULL;
 
     esp_err_t res = dht_read_float_data(

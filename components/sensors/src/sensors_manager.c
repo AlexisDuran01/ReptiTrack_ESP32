@@ -54,9 +54,12 @@ void sensors_manager_register_all(void) {
     
 	/*
 	 * DHT_TYPE_DHT11 se puede usar porque dht_sensor.h incluye dht.h,
-	 * por lo que los simbolos de dht.h quedan visibles indirectamente.
+	 * por lo que los simbolos de dht.h quedan visibles indirectamente
 	 * Esto se llama inclusion transitiva: una cabecera expone definiciones
-	 * de otra que incluye, sin necesidad de incluirla directamente.
+	 * de otra que incluye, sin necesidad de incluirla directamente
+	 
+	 // Un enum es una lista de nombres que representan números enteros
+	 // DHT_TYPE_DHT11 es uno de esos nombres dentro del enum dht_sensor_type_t
 	 */
 
     Sensor* dht11 = dht_sensor_create("dht01", 4, DHT_TYPE_DHT11);
@@ -67,10 +70,29 @@ void sensors_manager_register_all(void) {
     }
 
 
+	//Poner aqui los demas dht 22
+	
+	/*
+	// DHT_TYPE_AM2301,      //!< AM2301 (DHT21, DHT22, AM2302, AM2321)
+	
+	Sensor* dht22 = dht_sensor_create("dht22_01", 4, DHT_TYPE_AM2301);
+	if (dht22) {
+	    sensors_manager_register(dht22);
+	} else {
+	    ESP_LOGE(TAG, "No se pudo crear el sensor DHT22");
+	}
 
-    // Aquí puedes agregar otros sensores:
-    // Sensor* ldr = ldr_create("ldr01", 5);
-    // sensors_manager_register(ldr);
+	
+	
+	*/
+
+
+
+
+
+
+    // Aquí se agregan todos los  otros sensores:
+
 }
 
 // -------------------------------------------------------------------

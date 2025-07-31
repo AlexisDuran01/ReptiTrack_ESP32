@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "app-template",
-    "project_version":    "70efd4c-dirty",
+    "project_version":    "d361b08-dirty",
     "project_path":       "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32",
     "idf_path":           "D:/ESP32/Espressif/frameworks/esp-idf-v5.3.1",
     "build_dir":          "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build",
@@ -1495,7 +1495,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/sensors/libsensors.a",
-            "sources": [ "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/sensors/src/dht11.c", "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/sensors/src/sensors_manager.c" ],
+            "sources": [ "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/sensors/src/dht_sensor.c", "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/sensors/src/sensors_manager.c" ],
             "include_dirs": [ "include" ]
         },
         "soc": {
