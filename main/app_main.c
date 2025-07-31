@@ -9,8 +9,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "esp_log.h"
-#include <dht.h>
-
+#include "sensors_manager.h"
 
 //static const char *TAG = "app_main";
 
@@ -18,14 +17,24 @@
 // Esta es la función principal que se ejecuta al encender el esp32
 void app_main(void)
 {
+	
+	sensors_manager_init(); // Inicializa y registra los sensores
+	sensors_manager_start_read();  //  se encarga de mantener actualizados los datos
+	
     // Aquí se llama a la función que inicia el proceso de conexión Wi-Fi.
     // Esta función se encarga de todo lo necesario para que el dispositivo pueda conectarse a internet.
     my_wifi_prov_startup();
 
-    // Este es un ciclo que nunca termina.
+
+
+
     // Sirve para que el dispositivo siga funcionando y no se apague.
     // Dentro del ciclo, el dispositivo simplemente espera un segundo y vuelve a esperar, una y otra vez.
     while (1) {
         vTaskDelay(1000 / portTICK_PERIOD_MS); // Espera 1 segundo antes de repetir el ciclo
     }
 }
+
+
+
+

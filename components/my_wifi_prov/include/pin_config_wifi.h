@@ -12,4 +12,4 @@
 #define PROV_LED_GPIO        2   
 
 // Número de pin (GPIO) donde está conectado el botón físico para iniciar el receteo del aprovisinamiento
-#define PROV_BUTTON_GPIO     16  
+#define PROV_BUTTON_GPIO     19  

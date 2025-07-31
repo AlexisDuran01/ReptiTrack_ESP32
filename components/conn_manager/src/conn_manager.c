@@ -59,6 +59,7 @@ static void wifi_services_init_task(void *pvParameter) {
 
       	  // Inicializar MQTT aquí:
 		  mqtt_cliente_init();
+          
       
     } else {
         ESP_LOGW(TAG, "No hay conexión a internet, no se puede sincronizar la hora ni verificar servicios");
@@ -83,10 +84,10 @@ void *conn_manager_get_instance(void) {
         ESP_LOGD(TAG, "Instancia del gestor de conectividad creada");
     }
     return s_instance;
-}
-
-
-/// Inicializa el gestor de conectividad
+	}
+	
+	
+	/// Inicializa el gestor de conectividad
 void conn_manager_init(void) {
     // Verifica si la instancia singleton aún no está creada
     if (s_instance == NULL) {

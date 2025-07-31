@@ -105,5 +105,18 @@ esp_err_t rtc_time_set_synchronized(bool synced);
 esp_err_t rtc_time_clear_synchronized(void);
 
 
+/**
+ * @brief Devuelve la hora actual formateada como cadena legible: "YYYY-MM-DD HH:MM:SS"
+ * 
+ * Ejemplo de resultado: "2025-07-31 21:03:00"
+ * 
+ * @param[out] out_str  Buffer donde se escribirá la cadena formateada.
+ * @param[in]  max_len  Tamaño del buffer (mínimo recomendado: 32).
+ * 
+ * @return ESP_OK si fue exitoso.
+ *         ESP_ERR_INVALID_ARG si los argumentos son inválidos.
+ *         ESP_ERR_INVALID_STATE si el RTC no ha sido sincronizado.
+ */
+esp_err_t rtc_time_get_formatted_readable(char *out_str, size_t max_len);
 
 #endif // RTC_TIME_H

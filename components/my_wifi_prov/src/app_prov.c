@@ -270,6 +270,8 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Conectado a la red Wi-Fi IP obtenida: " IPSTR, IP2STR(&event->ip_info.ip));  // Mostramos la IP obtenida
         s_retry_num = 0;  // Reiniciamos el contador de reintentos ya que la conexión fue exitosa
 		
+		
+		
 		// Inicia el gestor de conectividad, que internamente verifica
 		//  y levanta todos los serviciones que necesita de internet
 		conn_manager_init();  

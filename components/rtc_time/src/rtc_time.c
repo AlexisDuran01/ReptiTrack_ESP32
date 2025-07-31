@@ -526,3 +526,59 @@ esp_err_t rtc_time_parse_iso8601_string(const char *iso_str, time_t *out_time) {
 
     return ESP_OK;  // Indica éxito en la conversión
 }
+
+
+/**
+ * @brief Devuelve la hora actual del RTC formateada como una cadena legible.
+ * 
+ * Esta función obtiene la hora actual (asumiendo que ya fue sincronizada previamente)
+ * y la convierte a una cadena con el siguiente formato:
+ *     "YYYY-MM-DD HH:MM:SS"
+ * 
+ * Este formato es ampliamente utilizado para mostrar fechas de forma legible en logs,
+ * interfaces, reportes o estructuras JSON. No incluye zona horaria ni separador 'T'.
+ * 
+ * Ejemplo de salida:
+ *     2025-07-31 21:03:00
+ * 
+ * @param[out] out_str  Buffer donde se escribirá la cadena resultante.
+ *                      Debe tener espacio suficiente (recomendado: al menos 32 bytes).
+ * @param[in]  max_len  Longitud máxima del buffer proporcionado.
+ *                      Si es menor a 20, se considera inválido.
+ * 
+ * @return ESP_OK si se obtuvo y formateó correctamente la fecha/hora.
+ *         ESP_ERR_INVALID_ARG si los argumentos son nulos o el buffer es muy pequeño.
+ *         ESP_ERR_INVALID_STATE si el RTC aún no ha sido sincronizado.
+ *         ESP_FAIL si ocurrió un error al formatear la fecha.
+ */
+esp_err_t rtc_time_get_formatted_readable(char *out_str, size_t max_len)
+{
+    // Validamos los argumentos de entrada
+    if (!out_str || max_len < 20) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Obtenemos la hora actual del sistema (en formato time_t)
+    time_t now;
+    esp_err_t err = rtc_time_get_current(&now);
+    if (err != ESP_OK) {
+        return err;  // Retornamos el error si el RTC no está sincronizado
+    }
+
+    // Convertimos time_t a estructura tm (desglosada en año, mes, día, etc.)
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+
+    // Formateamos la fecha y hora en el buffer de salida
+    // Formato: "YYYY-MM-DD HH:MM:SS" (ej: 2025-07-31 21:03:00)
+    size_t written = strftime(out_str, max_len, "%Y-%m-%d %H:%M:%S", &timeinfo);
+    
+    // Verificamos que strftime haya escrito correctamente
+    if (written == 0) {
+        return ESP_FAIL;  // El buffer fue insuficiente o hubo un error
+    }
+
+    // Todo salió bien
+    return ESP_OK;
+}
+

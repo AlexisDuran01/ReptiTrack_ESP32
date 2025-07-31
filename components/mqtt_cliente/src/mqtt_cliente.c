@@ -19,7 +19,9 @@
 
 #include "esp_crt_bundle.h"  // Asegúrate de incluir esto
 
+#include "rtc_time.h"            
 
+#include "sensors_manager.h"
 
 /// Etiqueta de logging para este módulo MQTT.
 // Se utiliza como prefijo en todos los mensajes de log generados por ESP_LOGI, ESP_LOGE, etc.
@@ -124,6 +126,38 @@ bool mqtt_cliente_unregister_listener(mqtt_message_callback_t callback) {
 }
 
 
+
+void publish_estado_conectado(void) {
+    char time_str[64];  // Suficiente para "YYYY-MM-DD HH:MM:SS"
+
+    // Obtener la fecha/hora actual del RTC en formato legible
+    esp_err_t err = rtc_time_get_formatted_readable(time_str, sizeof(time_str));
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "RTC no sincronizado, no se puede publicar estado conectado con fecha");
+        return;
+    }
+
+    // Crear el payload JSON
+    char json_payload[128];
+    int ret = snprintf(json_payload, sizeof(json_payload),
+                       "{\"fecha\":\"%s\",\"estatus\":\"conectado\"}",
+                       time_str);
+
+    if (ret < 0 || ret >= (int)sizeof(json_payload)) {
+        ESP_LOGE(TAG, "Error creando JSON para estado conectado");
+        return;
+    }
+
+    // Publicar al tópico "estatus"
+    bool publicado = mqtt_cliente_publish_with_base("estatus", json_payload, 1, false);
+    if (!publicado) {
+        ESP_LOGW(TAG, "No se pudo publicar estado conectado");
+    } else {
+        ESP_LOGI(TAG, "Estado conectado publicado correctamente");
+    }
+}
+
+
 //
 // -----------------------------
 // HANDLER DE EVENTOS MQTT
@@ -149,11 +183,15 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT conectado");
             // Aquí podrías hacer una suscripción por defecto si deseas
-            // esp_mqtt_client_subscribe(s_mqtt_client, "tu/topic", 1);
             
-		    if (!mqtt_cliente_publish_with_base("estatus", "conectado", 1, 1)) {
-		    ESP_LOGW(TAG, "No se pudo publicar estado conectado");
-		}
+			publish_estado_conectado();
+		
+		    if (sensors_manager_is_initialized()) {
+                ESP_LOGI(TAG, "Publicando datos iniciales de sensores tras conexion MQTT \n \n \n");
+                sensors_manager_start_publish();
+            } else {
+                ESP_LOGW(TAG, "Manager de sensores no inicializado, no se publican datos");
+            }
 
 			    
             break;
