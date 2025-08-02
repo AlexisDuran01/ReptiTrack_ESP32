@@ -32,6 +32,7 @@
 #include "nvs_utils.h"               
 #include "conn_manager.h"               
 #include "mqtt_cliente.h"
+#include "firestore.h"
 
 static const char *TAG = "wifi_prov";             // Etiqueta para los mensajes en consola
 
@@ -270,8 +271,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Conectado a la red Wi-Fi IP obtenida: " IPSTR, IP2STR(&event->ip_info.ip));  // Mostramos la IP obtenida
         s_retry_num = 0;  // Reiniciamos el contador de reintentos ya que la conexión fue exitosa
 		
-		
-		
 		// Inicia el gestor de conectividad, que internamente verifica
 		//  y levanta todos los serviciones que necesita de internet
 		conn_manager_init();  
@@ -284,13 +283,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 // Inicializa los sistemas básicos del ESP32 (memoria, red, Wi-Fi)
 esp_err_t init_base_system(void)
 {
-    ESP_LOGI(TAG, "Inicializando NVS");
-    esp_err_t ret = nvs_flash_init();                // Inicializa la memoria no volátil
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());          // Si hay error, borra la NVS
-        ret = nvs_flash_init();                      // Y vuelve a inicializar
-    }
-    ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "Inicializando TCP/IP y event loop");
     ESP_ERROR_CHECK(esp_netif_init());               // Inicializa la pila de red
@@ -454,39 +446,66 @@ static esp_err_t db_config_handler(uint32_t session_id, const uint8_t *inbuf, ss
         cJSON *userId = cJSON_GetObjectItem(root, "userId");
 
         // Extrae el campo "espId" del JSON (esperado como cadena)
-        cJSON *espId = cJSON_GetObjectItem(root, "espId");  // <-- NUEVO campo opcional para identificar el dispositivo
+        cJSON *espId = cJSON_GetObjectItem(root, "espId");  // campo para identificar el dispositivo
 
-        // Verifica que userId exista y sea una cadena válida
+		
+		cJSON *terrarioId = cJSON_GetObjectItem(root, "terrarioId");  // campo nuevo requerido
+
+		   // Verifica que espId exista y sea una cadena válida
         if (userId && cJSON_IsString(userId)) {
             ESP_LOGI(TAG, "User ID recibido: %s", userId->valuestring);
-            // Aquí puedes guardar el userId en NVS o usarlo según tu lógica
         } else {
-            ESP_LOGW(TAG, "User ID no recibido o inválido");
+            ESP_LOGW(TAG, "User ID no recibido o inválido");  
         }
+        
+	
 
-        // Verifica que espId exista y sea una cadena válida
+
+    // Validar y guardar userId y terrarioId usando firestore_t
+        if (userId && cJSON_IsString(userId) && terrarioId && cJSON_IsString(terrarioId)) {
+            firestore_t data = {0};
+            strncpy(data.user_id, userId->valuestring, sizeof(data.user_id) - 1);
+            strncpy(data.terrario_id, terrarioId->valuestring, sizeof(data.terrario_id) - 1);
+
+            esp_err_t err = firestore_save(&data);
+            
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Error guardando Firestore credentials: %s", esp_err_to_name(err));
+            } else {
+                ESP_LOGI(TAG, "Firestore user_id y terrario_id guardados en NVS");
+            }
+        } else {
+            ESP_LOGW(TAG, "userId o terrarioId no recibidos o invalidos");
+        }
+        
+        // Guardar userId en NVS bajo namespace "database" con key "user_id"
+ 		// Verifica que userId exista y sea una cadena válida
+		if (userId && cJSON_IsString(userId)) {
+		    firestore_t data = {0};  // Cero la estructura completa
+		    strncpy(data.user_id, userId->valuestring, sizeof(data.user_id) - 1);
+		    // terrario_id 
+		
+		    esp_err_t err = firestore_save(&data);
+		    if (err != ESP_OK) {
+		        ESP_LOGE(TAG, "Error guardando user_id en Firestore NVS: %s", esp_err_to_name(err));
+		    } else {
+		        ESP_LOGI(TAG, "Firestore user_id guardado en NVS");
+		    }
+		} else {
+		    ESP_LOGW(TAG, "userId no recibido o inválido");
+		}
+		
+		
+		   // Verifica que espId exista y sea una cadena válida
         if (espId && cJSON_IsString(espId)) {
             ESP_LOGI(TAG, "ESP ID recibido: %s", espId->valuestring);
-            // Aquí también puedes guardar el espId si lo necesitas para MQTT u otra configuración
         } else {
             ESP_LOGW(TAG, "ESP ID no recibido o inválido");  
         }
         
-        
-        // Guardar userId en NVS bajo namespace "database" con key "user_id"
-        if (userId && cJSON_IsString(userId)) {
-            ESP_LOGI(TAG, "User ID recibido: %s", userId->valuestring);
-            esp_err_t err = nvs_utils_save_blob("database", "user_id", userId->valuestring, strlen(userId->valuestring) + 1);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Error guardando userId en NVS: %s", esp_err_to_name(err));
-            }
-        } else {
-            ESP_LOGW(TAG, "User ID no recibido o inválido");
-        }
-
+		
         // Guardar espId en NVS bajo namespace "dev_info" con key "esp_id"
         if (espId && cJSON_IsString(espId)) {
-            ESP_LOGI(TAG, "ESP ID recibido: %s", espId->valuestring);
             esp_err_t err = nvs_utils_save_blob("dev_info", "esp_id", espId->valuestring, strlen(espId->valuestring) + 1);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Error guardando espId en NVS: %s", esp_err_to_name(err));

@@ -88,7 +88,7 @@ bool sensors_manager_is_fully_operational(void);
  * como `dht11_create(...)`, `ldr_create(...)`, etc.
  *
  */
-void sensors_manager_register_all(void);
+bool sensors_manager_register_all(void);
 
 /**
  * @brief Libera memoria y detiene tareas relacionadas al manager.
@@ -97,6 +97,12 @@ void sensors_manager_register_all(void);
  */
 void sensors_manager_deinit(void);
 
+
+/**
+ * @brief  Verifica si el sistema está totalmente listo
+ *
+ * Verifica que se haya inicializado una instancia y esten activas las tareas
+ */
 
 bool sensors_manager_is_fully_operational(void);
 #endif // Fin del include guard

@@ -85,7 +85,10 @@ D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/nvs_utils/libnvs_
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/rtc_time/librtc_time.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/esp-idf-lib__dht/libesp-idf-lib__dht.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/sensors/libsensors.a
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/firestore/libfirestore.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/mqtt_cliente/libmqtt_cliente.a
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/actuators/libactuators.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/conn_manager/libconn_manager.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/my_wifi_prov/libmy_wifi_prov.a
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/esp-idf-lib__ultrasonic/libesp-idf-lib__ultrasonic.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/main/libmain.a

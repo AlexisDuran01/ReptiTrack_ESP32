@@ -145,7 +145,13 @@ esp_err_t nvs_utils_load_blob(const char *namespace, const char *key, void *data
 esp_err_t nvs_utils_erase_key(const char *namespace, const char *key);
 
 
-
+/**
+ * @brief Inicializa la partición NVS, borrando y reiniciando si es necesario.
+ * 
+ * Esta función debe llamarse antes de cualquier operación con NVS.
+ * Maneja errores típicos de inicialización y garantiza que NVS esté lista.
+ */
+void nvs_utils_init(void);
 
 
 

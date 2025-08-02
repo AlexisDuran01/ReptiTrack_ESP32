@@ -29,6 +29,21 @@
 static const char *TAG = "nvs_utils";
 
 
+void nvs_utils_init(void) {
+    ESP_LOGI(TAG, "Inicializando NVS");
+    esp_err_t ret = nvs_flash_init();
+
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "NVS sin páginas libres o versión nueva encontrada, borrando NVS...");
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+
+    ESP_ERROR_CHECK(ret);
+    ESP_LOGI(TAG, "NVS inicializada correctamente");
+}
+
+
 /**
  * Guarda un bloque de datos binarios (blob) en la NVS.
  * Esto es útil para guardar configuraciones, estados u objetos serializados.
@@ -118,7 +133,7 @@ esp_err_t nvs_utils_load_blob(const char *namespace, const char *key, void *data
     }
     
     // Log informativo indicando que se intentará leer un blob de NVS en el namespace y clave indicados
-    ESP_LOGI(TAG, "Leyendo blob de NVS [%s/%s]", namespace, key);
+    //ESP_LOGI(TAG, "Leyendo blob de NVS [%s/%s]", namespace, key);
 
     // Declaración del handle para abrir el espacio de nombres NVS
     nvs_handle_t nvs;
@@ -154,7 +169,7 @@ esp_err_t nvs_utils_load_blob(const char *namespace, const char *key, void *data
 	
 	if (is_text) {
 	    // Si es una cadena terminada en nulo sin bytes nulos intermedios, se imprime como texto
-	    ESP_LOGI(TAG, "Valor leido de NVS [%s/%s]: \"%s\"", namespace, key, (char*)data);
+	    //ESP_LOGI(TAG, "Valor leido de NVS [%s/%s]: \"%s\"", namespace, key, (char*)data);
 	} 
 	// 2. Detecta si es un bool simple de 1 byte
 	else if (required_size == 1) {
@@ -165,9 +180,9 @@ esp_err_t nvs_utils_load_blob(const char *namespace, const char *key, void *data
 	else if (required_size == 4) {
 	    uint32_t val = *(uint32_t*)data;
 	    if (val == 0 || val == 1) {
-	        ESP_LOGI(TAG, "Valor leido de NVS [%s/%s]: (int-bool) %s", namespace, key, val ? "true" : "false");
+	     //   ESP_LOGI(TAG, "Valor leido de NVS [%s/%s]: (int-bool) %s", namespace, key, val ? "true" : "false");
 	    } else {
-			ESP_LOGI(TAG, "Valor leido de NVS [%s/%s]: (uint32) %" PRIu32, namespace, key, val);
+			//ESP_LOGI(TAG, "Valor leido de NVS [%s/%s]: (uint32) %" PRIu32, namespace, key, val);
 	    }
 	}
 	// 4. Si no es interpretable como texto o bool, lo imprime en formato hexadecimal parcial

@@ -51,7 +51,7 @@ esp_err_t rtc_time_is_synchronized(bool *out_synced) {
     if (err == ESP_OK) {
         // ... convertimos el valor leido a booleano (cualquier valor distinto de 0 es true).
         *out_synced = (stored_value != 0);
-        ESP_LOGI(TAG, "Flag sincronizacion leido: %d", stored_value);
+        //ESP_LOGI(TAG, "Flag sincronizacion leido: %d", stored_value);
 
     // Si la clave no fue encontrada en NVS, lo interpretamos como "no sincronizado" (estado inicial).
     } else if (err == ESP_ERR_NVS_NOT_FOUND) {

@@ -17,11 +17,13 @@
 // Incluye funciones estándar de C para manipular cadenas de texto (como strlen, snprintf, strcmp, etc.).
 #include <string.h>
 
-#include "esp_crt_bundle.h"  // Asegúrate de incluir esto
+#include "esp_crt_bundle.h"  
 
 #include "rtc_time.h"            
 
 #include "sensors_manager.h"
+
+#include "firestore.h"
 
 /// Etiqueta de logging para este módulo MQTT.
 // Se utiliza como prefijo en todos los mensajes de log generados por ESP_LOGI, ESP_LOGE, etc.
@@ -213,7 +215,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         // Evento cuando un mensaje fue publicado con éxito
         case MQTT_EVENT_PUBLISHED:
-            ESP_LOGI(TAG, "Mensaje publicado, msg_id=%d", event->msg_id);
+            //ESP_LOGI(TAG, "Mensaje publicado, msg_id=%d", event->msg_id);
             break;
 
         // Evento cuando se recibe un mensaje desde el broker (al estar suscrito)
@@ -283,7 +285,7 @@ void mqtt_cliente_init(void) {
    			 .broker.verification.crt_bundle_attach = esp_crt_bundle_attach,  // usa el bundle de certificados
 		    .credentials.username = strlen(creds.username) > 0 ? creds.username : NULL,
 		    .credentials.authentication.password = strlen(creds.password) > 0 ? creds.password : NULL,
-		    .network.reconnect_timeout_ms = 10000,
+		    .network.reconnect_timeout_ms = 3000,
 		    .network.disable_auto_reconnect = false,
 		};
     // Crea e inicializa el cliente MQTT
@@ -382,13 +384,20 @@ bool mqtt_cliente_build_base_topic(void) {
     char user_id[64] = {0};  // Buffer para almacenar el userId leído desde NVS
     char esp_id[16] = {0};   // Buffer para almacenar el espId leído desde NVS
     size_t len = 0;          // Longitud real de los datos leídos
+    
+    
+    // --- Cargar user_id desde estructura firestore_t ---
+    firestore_t firestore_data = {0};
 
     // --- Leer el userId desde NVS (namespace "database", clave "user_id") ---
-    len = sizeof(user_id);
-    if (nvs_utils_load_blob("database", "user_id", user_id, len, &len) != ESP_OK || len == 0) {
-        ESP_LOGW(TAG, "No se pudo leer userId de NVS");
+    if (firestore_load(&firestore_data) != ESP_OK || strlen(firestore_data.user_id) == 0) {
+        ESP_LOGW(TAG, "No se pudo cargar user_id desde Firestore data");
         return false;
     }
+    
+    // Copiar a variable user_id de la estructura firestore_t
+    strncpy(user_id, firestore_data.user_id, sizeof(user_id) - 1);  
+
 
     // --- Leer el espId desde NVS (namespace "dev_info", clave "esp_id") ---
     len = sizeof(esp_id);

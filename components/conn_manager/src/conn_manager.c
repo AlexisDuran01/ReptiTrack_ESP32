@@ -5,6 +5,9 @@
 #include "network_utils.h"        // Incluye funciones utilitarias de red, como check_internet_connection(), get_local_ip(), etc.
 #include "rtc_time.h"             // Incluye funciones para sincronización y manejo del reloj RTC.
 #include "mqtt_cliente.h"
+#include "sensors_manager.h"
+#include "firestore.h"
+#include "actuators_manager.h"
 
 static const char *TAG = "conn_manager";  
 // TAG para usar en logs con ESP_LOG*, para identificar la fuente del mensaje en la consola.
@@ -55,12 +58,37 @@ static void wifi_services_init_task(void *pvParameter) {
     if (check_internet_connection(3000)) {
         ESP_LOGI(TAG, "Conexion a internet OK");
         rtc_time_sync_with_timezone("America/Mexico_City"); // Sincroniza la hora local con el servidor NTP
-        rtc_time_print_current();                           // Imprime la hora sincronizada actual
+        rtc_time_print_current();       
+        
 
-      	  // Inicializar MQTT aquí:
-		  mqtt_cliente_init();
-          
-      
+      	 // Inicializar MQTT aquí:
+		mqtt_cliente_init();
+		 
+        firestore_init();
+	        
+	    actuators_manager_init();
+	    
+		actuators_manager_start_all();
+			
+        
+
+		char *response = NULL;
+		size_t len = 0;
+		
+		if (firestore_is_initialized()) {
+		    esp_err_t err = firestore_get_document("terrarios", &response, &len);
+		    if (err == ESP_OK) {
+		        ESP_LOGI(TAG, "Respuesta Firestore (%d bytes): %s\n", (int)len, response);
+		        free(response);  // Liberar memoria para evitar fugas
+		    } else {
+		        ESP_LOGE(TAG, "Error leyendo documento Firestore: %s", esp_err_to_name(err));
+		    }
+		} else {
+		    ESP_LOGE(TAG, "Firestore no inicializado correctamente");
+		}
+
+
+	   		 
     } else {
         ESP_LOGW(TAG, "No hay conexión a internet, no se puede sincronizar la hora ni verificar servicios");
     }
@@ -102,7 +130,7 @@ void conn_manager_init(void) {
         BaseType_t result = xTaskCreate(
             wifi_services_init_task, // Función que ejecuta la tarea
             "wifi_services_init",             // Nombre identificativo de la tarea
-            4096,                         // Tamaño de pila asignado a la tarea (en bytes)
+            8192,                         // Tamaño de pila asignado a la tarea (en bytes)
             NULL,                         // Parámetro que se pasa a la tarea (aquí ninguno)
             5,                            // Prioridad de la tarea (5 es valor medio-alto)
             NULL                          // Puntero para almacenar el handle de la tarea (no se usa aquí)

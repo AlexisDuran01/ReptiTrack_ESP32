@@ -16,4 +16,6 @@ idf_component_register(
     nvs_utils
     conn_manager
     mqtt_cliente
+    firestore
+    
 )

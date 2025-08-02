@@ -85,7 +85,10 @@ $<TARGET_FILE:__idf_nvs_utils>
 $<TARGET_FILE:__idf_rtc_time>
 $<TARGET_FILE:__idf_esp-idf-lib__dht>
 $<TARGET_FILE:__idf_sensors>
+$<TARGET_FILE:__idf_firestore>
 $<TARGET_FILE:__idf_mqtt_cliente>
+$<TARGET_FILE:__idf_actuators>
 $<TARGET_FILE:__idf_conn_manager>
 $<TARGET_FILE:__idf_my_wifi_prov>
+$<TARGET_FILE:__idf_esp-idf-lib__ultrasonic>
 $<TARGET_FILE:__idf_main>
