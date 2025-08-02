@@ -852,6 +852,13 @@ D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/esp-idf-lib__dht/
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/esp-idf-lib__dht/CMakeFiles/install.dir
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/esp-idf-lib__dht/CMakeFiles/install/local.dir
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/esp-idf-lib__dht/CMakeFiles/install/strip.dir
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/pzem004tv3/CMakeFiles/__idf_pzem004tv3.dir
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/pzem004tv3/CMakeFiles/edit_cache.dir
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/pzem004tv3/CMakeFiles/rebuild_cache.dir
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/pzem004tv3/CMakeFiles/list_install_components.dir
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/pzem004tv3/CMakeFiles/install.dir
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/pzem004tv3/CMakeFiles/install/local.dir
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/pzem004tv3/CMakeFiles/install/strip.dir
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/sensors/CMakeFiles/__idf_sensors.dir
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/sensors/CMakeFiles/edit_cache.dir
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/sensors/CMakeFiles/rebuild_cache.dir

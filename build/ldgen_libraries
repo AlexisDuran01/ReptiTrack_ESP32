@@ -84,6 +84,7 @@ D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/network_utils/lib
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/nvs_utils/libnvs_utils.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/rtc_time/librtc_time.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/esp-idf-lib__dht/libesp-idf-lib__dht.a
+D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/pzem004tv3/libpzem004tv3.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/sensors/libsensors.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/firestore/libfirestore.a
 D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/mqtt_cliente/libmqtt_cliente.a

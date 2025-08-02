@@ -357,7 +357,7 @@ void dispenser_actuator_start(Actuator* actuator) {
         BaseType_t fetch_result = xTaskCreate(
             fetch_task,
             "fetch_task",
-            4096,       // Tamaño apropiado para fetch, ajustar si es necesario
+            8192,       // Tamaño apropiado para fetch, ajustar si es necesario
             (void*) self,
             5,
             &fetch_task_handle

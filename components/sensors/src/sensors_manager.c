@@ -8,6 +8,7 @@
 #include <freertos/task.h>       // API para crear tareas
 #include "esp_log.h"             // Log para ESP-IDF
 #include "nvs_utils.h"
+#include "pzem_sensor.h"               // Implementación del sensor DHT11 (ejemplo)
 
 // -------------------------------------------------------------------
 // Definiciones internas
@@ -102,15 +103,33 @@ bool sensors_manager_register_all(void) {
 		 
 		 // Un enum es una lista de nombres que representan números enteros
 		 // DHT_TYPE_DHT11 es uno de esos nombres dentro del enum dht_sensor_type_t
+		 
+		
+	    
 		 */
-	
-	    Sensor* dht11 = dht_sensor_create("dht01", 4, DHT_TYPE_DHT11);
+		 
+		 Sensor* dht11 = dht_sensor_create("dht01", 4, DHT_TYPE_DHT11);
 	    if (dht11) {
 	        sensors_manager_register(dht11);
 	    } else {
 	        ESP_LOGE(TAG, "No se pudo crear el sensor DHT11");
 	    }
-	    
+		 
+			pzem_setup_t pzConf = {
+			    .pzem_uart   = UART_NUM_2,
+			    .pzem_rx_pin = GPIO_NUM_16,
+			    .pzem_tx_pin = GPIO_NUM_17,
+			    .pzem_addr   = PZ_DEFAULT_ADDRESS,
+			};
+			Sensor* pzem = pzem_sensor_create("pzem004", &pzConf);
+			if (pzem) {
+			    pzem->init(pzem); // Inicializa el UART usando PzemInit internamente
+			    sensors_manager_register(pzem);
+			} else {
+			    ESP_LOGE(TAG, "No se pudo crear el sensor PZEM");
+			}
+	
+		
 	    return true;
         
     } 
@@ -212,7 +231,7 @@ void sensors_manager_start_read(void) {
     xTaskCreate(
         sensors_read_task,
         "SensorsRead",
-        4096,
+        8192,
         NULL,
         5,
         &read_task_handle

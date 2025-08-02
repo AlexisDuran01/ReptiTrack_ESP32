@@ -84,6 +84,7 @@ $<TARGET_FILE:__idf_network_utils>
 $<TARGET_FILE:__idf_nvs_utils>
 $<TARGET_FILE:__idf_rtc_time>
 $<TARGET_FILE:__idf_esp-idf-lib__dht>
+$<TARGET_FILE:__idf_pzem004tv3>
 $<TARGET_FILE:__idf_sensors>
 $<TARGET_FILE:__idf_firestore>
 $<TARGET_FILE:__idf_mqtt_cliente>

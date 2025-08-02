@@ -16,6 +16,7 @@ typedef struct {
 // name: identificador único (ej. "dth01")
 // gpio_num: pin GPIO donde está conectado
 // sensor_type: tipo del sensor (DHT_TYPE_DHT11, DHT_TYPE_AM2301, etc)
+
 Sensor* dht_sensor_create(const char* name, int gpio_num, dht_sensor_type_t sensor_type);
 
 #endif // DHT11_H

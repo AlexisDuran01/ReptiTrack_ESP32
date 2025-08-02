@@ -10,11 +10,11 @@
 #define DISPENSER_PWM_TIMER_ID     LEDC_TIMER_0        // Timer PWM usado
 #define DISPENSER_PWM_MODO         LEDC_HIGH_SPEED_MODE// Modo de alta velocidad
 #define DISPENSER_PWM_FRECUENCIA   20000               // Frecuencia PWM 20 kHz
-#define DISPENSER_PWM_DUTY         220                 // Duty cycle (valor 0-255 para 8 bits)
+#define DISPENSER_PWM_DUTY         223                 // Duty cycle (valor 0-255 para 8 bits)
 #define DISPENSER_PWM_RESOLUCION   LEDC_TIMER_8_BIT    // Resolución PWM (8 bits)
 
 #define DISPENSER_TIEMPO_FRENADO_MS    20                   // Tiempo de frenado suave (ms)
-#define DISPENSER_TIEMPO_MAX_MOVIMIENTO_MS 800              // Tiempo máximo permitido para un giro (ms)
+#define DISPENSER_TIEMPO_MAX_MOVIMIENTO_MS 1000              // Tiempo máximo permitido para un giro (ms)
 typedef struct {
     char id[16];
     time_t fecha_programada;
