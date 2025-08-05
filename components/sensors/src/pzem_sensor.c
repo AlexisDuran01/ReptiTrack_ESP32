@@ -31,7 +31,7 @@ static void* pzem_read(Sensor* self) {
         data->last_values.frequency = -1;
         data->last_values.pf        = -1;
 
-        ESP_LOGE(TAG, "Error leyendo PZEM '%s'", self->name);
+        //ESP_LOGE(TAG, "Error leyendo PZEM '%s'", self->name);
         return NULL;
     }
 
@@ -70,7 +70,7 @@ static bool pzem_publish(Sensor* self) {
 
     // Opcional: log de resultado
     if (published) {
-		ESP_LOGI(TAG, "Publicacion exitosa para sensor %s", self->name);
+		//ESP_LOGI(TAG, "Publicacion exitosa para sensor %s", self->name);
     } else {
         ESP_LOGE("PZEMSensor", "Fallo en la publicacion para sensor %s", self->name);
     }

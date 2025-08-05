@@ -4,6 +4,7 @@
 #include <string.h>
 #include "esp_crt_bundle.h"  
 #include "esp_http_client.h"
+#include "cJSON.h"  // Asegúrate de incluir cJSON si no está
 
 static const char *TAG = "firestore";
 
@@ -40,7 +41,7 @@ static esp_err_t client_event_handler(esp_http_client_event_t *evt) {
 	
     // Se ejecuta justo después de que se establece una conexión con el servidor
     case HTTP_EVENT_ON_CONNECTED:
-        ESP_LOGI(TAG, "HTTP_EVENT_ON_CONNECTED: Conexion TLS establecida con el servidor");
+        //ESP_LOGI(TAG, "HTTP_EVENT_ON_CONNECTED: Conexion TLS establecida con el servidor");
         break;
 
 	 // Se ejecuta cada vez que se reciben datos del cuerpo (body) de la respuesta.
@@ -112,20 +113,6 @@ void firestore_init(void) {
     }
 }
 
-/// @brief Libera recursos internos (por ahora no hace nada)
-void firestore_deinit(void) {
-    // Si hay recursos dinámicos, liberar aquí
-}
-
-
-bool firestore_is_initialized(void) {
-    return firestore_initialized;
-}
-
-
-
-
-
 
 /// @brief Construye la URL base para Firestore usando los IDs almacenados en NVS
 // Construye la URL base para Firestore con los datos cargados
@@ -185,6 +172,78 @@ char *firestore_build_url(const char *subpath) {
     snprintf(full_url, total_len, "%s/%s", base_url, clean_subpath);
     return full_url;
 }
+
+/// @brief Libera recursos internos (por ahora no hace nada)
+void firestore_deinit(void) {
+    // Si hay recursos dinámicos, liberar aquí
+}
+
+
+bool firestore_is_initialized(void) {
+    return firestore_initialized;
+}
+
+
+bool firestore_check_connectivity(void) {
+    if (!firestore_is_initialized()) {
+        ESP_LOGW(TAG, "Firestore no inicializado");
+        return false;
+    }
+
+    const char *test_path = "terrarios";
+    char *response = NULL;
+    size_t response_len = 0;
+
+    esp_err_t err = firestore_get_document(test_path, &response, &response_len);
+    if (err != ESP_OK || !response) {
+        ESP_LOGE(TAG, "Fallo al hacer GET para verificar conectividad");
+        return false;
+    }
+
+    cJSON *json = cJSON_Parse(response);
+    if (!json) {
+        ESP_LOGE(TAG, "Respuesta no es JSON válido");
+        free(response);
+        return false;
+    }
+
+    cJSON *documents = cJSON_GetObjectItem(json, "documents");
+    bool resultado = false;
+
+    if (documents && cJSON_IsArray(documents) && cJSON_GetArraySize(documents) > 0) {
+        cJSON *primer_doc = cJSON_GetArrayItem(documents, 0);
+        cJSON *name_field = cJSON_GetObjectItem(primer_doc, "name");
+
+        if (name_field && cJSON_IsString(name_field)) {
+            const char *full_name = name_field->valuestring;
+
+            // Extraer el ID final del path completo (último segmento del path)
+            const char *last_slash = strrchr(full_name, '/');
+            if (last_slash && *(last_slash + 1)) {
+                const char *terrario_id = last_slash + 1;
+                ESP_LOGI(TAG, "ID de terrario encontrado: %s", terrario_id);
+
+                // Guardar el ID como blob en NVS
+                esp_err_t save_err = nvs_utils_save_blob("terrarios", "id", terrario_id, strlen(terrario_id) + 1);
+                if (save_err == ESP_OK) {
+                    resultado = true;
+                } else {
+                    ESP_LOGE(TAG, "Error al guardar terrario_id en NVS: %s", esp_err_to_name(save_err));
+                }
+            } else {
+                ESP_LOGW(TAG, "No se pudo extraer ID del campo name");
+            }
+        } else {
+        }
+    } else {
+        ESP_LOGW(TAG, "No hay documentos en la colección terrarios");
+    }
+
+    cJSON_Delete(json);
+    free(response);
+    return resultado;
+}
+
 
 
 /// @brief Retorna la URL base construida anteriormente
@@ -388,25 +447,31 @@ esp_err_t firestore_overwrite_document(const char *subpath, const char *jsonPayl
     if (!firestore_is_initialized()) return ESP_ERR_INVALID_STATE;
     if (!subpath || !jsonPayload || !outResponse || max_len == 0) return ESP_ERR_INVALID_ARG;
 
-    char *full_url = firestore_build_url(subpath);
-    if (!full_url) return ESP_FAIL;
+    // Construir URL base con helper
+    char *url_base = firestore_build_url(subpath);
+    if (!url_base) return ESP_ERR_NO_MEM;
 
+    // En este caso no hay query, solo necesitamos la URL completa tal cual
+    char *full_url = strdup(url_base);
+    free(url_base);
+    if (!full_url) return ESP_ERR_NO_MEM;
+
+    // Preparar buffer para respuesta
     http_response_t response = {
         .buffer = malloc(512),
         .length = 0,
         .capacity = 512
     };
-
     if (!response.buffer) {
         free(full_url);
         return ESP_ERR_NO_MEM;
     }
-
     response.buffer[0] = '\0';
 
+    // Configurar cliente HTTP
     esp_http_client_config_t config = {
         .url = full_url,
-        .method = HTTP_METHOD_PUT,
+        .method = HTTP_METHOD_PUT,  // PUT para sobreescribir todo el documento
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .timeout_ms = 5000,
@@ -421,10 +486,7 @@ esp_err_t firestore_overwrite_document(const char *subpath, const char *jsonPayl
         return ESP_FAIL;
     }
 
-    // Establece encabezados
     esp_http_client_set_header(client, "Content-Type", "application/json");
-
-    // Establece el cuerpo de la solicitud
     esp_http_client_set_post_field(client, jsonPayload, strlen(jsonPayload));
 
     esp_err_t err = esp_http_client_perform(client);
@@ -433,7 +495,7 @@ esp_err_t firestore_overwrite_document(const char *subpath, const char *jsonPayl
     esp_http_client_cleanup(client);
     free(full_url);
 
-    if (err != ESP_OK || status != 200) {
+    if (err != ESP_OK || (status != 200 && status != 201)) {
         ESP_LOGE(TAG, "Error al sobrescribir documento. Código HTTP: %d", status);
         free(response.buffer);
         return ESP_FAIL;
@@ -441,7 +503,6 @@ esp_err_t firestore_overwrite_document(const char *subpath, const char *jsonPayl
 
     if (response.length >= max_len) {
         ESP_LOGW(TAG, "Respuesta demasiado larga (%zu bytes), se truncará a %zu bytes", response.length, max_len - 1);
-        response.buffer[max_len - 1] = '\0';
         strncpy(outResponse, response.buffer, max_len - 1);
         outResponse[max_len - 1] = '\0';
     } else {
@@ -452,29 +513,51 @@ esp_err_t firestore_overwrite_document(const char *subpath, const char *jsonPayl
     return ESP_OK;
 }
 
-esp_err_t firestore_update_fields(const char *subpath, const char *jsonPayload, char *outResponse, size_t max_len) {
+
+
+esp_err_t firestore_update_document(const char *subpath, const char *jsonPayload, const char *updateMask, char *outResponse, size_t max_len) {
     if (!firestore_is_initialized()) return ESP_ERR_INVALID_STATE;
     if (!subpath || !jsonPayload || !outResponse || max_len == 0) return ESP_ERR_INVALID_ARG;
 
-    char *full_url = firestore_build_url(subpath);
-    if (!full_url) return ESP_FAIL;
+    // Construir la URL base con firestore_build_url
+    char *url_base = firestore_build_url(subpath);
+    if (!url_base) return ESP_ERR_NO_MEM;
 
+    // Preparar la cadena para el query updateMask (si no se pasa, no se añade)
+    const char *query_format = "?updateMask.fieldPaths=%s";
+    size_t query_len = (updateMask && strlen(updateMask) > 0) ? strlen(query_format) + strlen(updateMask) : 0;
+    
+    size_t full_url_len = strlen(url_base) + query_len + 1; // +1 para '\0'
+    char *full_url = malloc(full_url_len);
+    if (!full_url) {
+        free(url_base);
+        return ESP_ERR_NO_MEM;
+    }
+
+    if (query_len > 0) {
+        snprintf(full_url, full_url_len, "%s?updateMask.fieldPaths=%s", url_base, updateMask);
+    } else {
+        // No updateMask, solo copiar URL base
+        strncpy(full_url, url_base, full_url_len);
+        full_url[full_url_len - 1] = '\0';
+    }
+    free(url_base);
+
+    // Preparar buffer para respuesta
     http_response_t response = {
         .buffer = malloc(512),
         .length = 0,
         .capacity = 512
     };
-
     if (!response.buffer) {
         free(full_url);
         return ESP_ERR_NO_MEM;
     }
-
     response.buffer[0] = '\0';
 
     esp_http_client_config_t config = {
         .url = full_url,
-        .method = HTTP_METHOD_PATCH,
+        .method = HTTP_METHOD_PATCH,  // PATCH para actualizar parcialmente
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .timeout_ms = 5000,
@@ -489,10 +572,7 @@ esp_err_t firestore_update_fields(const char *subpath, const char *jsonPayload, 
         return ESP_FAIL;
     }
 
-    // Establece encabezado para indicar contenido JSON
     esp_http_client_set_header(client, "Content-Type", "application/json");
-
-    // Establece el cuerpo de la solicitud (payload JSON)
     esp_http_client_set_post_field(client, jsonPayload, strlen(jsonPayload));
 
     esp_err_t err = esp_http_client_perform(client);
@@ -501,15 +581,13 @@ esp_err_t firestore_update_fields(const char *subpath, const char *jsonPayload, 
     esp_http_client_cleanup(client);
     free(full_url);
 
-    if (err != ESP_OK || status != 200) {
-        ESP_LOGE(TAG, "Error al actualizar campos. Código HTTP: %d", status);
+    if (err != ESP_OK || (status != 200 && status != 201)) {
+        ESP_LOGE(TAG, "Error al actualizar documento. Código HTTP: %d", status);
         free(response.buffer);
         return ESP_FAIL;
     }
 
     if (response.length >= max_len) {
-        ESP_LOGW(TAG, "Respuesta demasiado larga (%zu bytes), se truncará a %zu bytes", response.length, max_len - 1);
-        response.buffer[max_len - 1] = '\0';
         strncpy(outResponse, response.buffer, max_len - 1);
         outResponse[max_len - 1] = '\0';
     } else {
@@ -519,4 +597,6 @@ esp_err_t firestore_update_fields(const char *subpath, const char *jsonPayload, 
     free(response.buffer);
     return ESP_OK;
 }
+
+
 

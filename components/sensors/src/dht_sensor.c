@@ -46,7 +46,7 @@ static void* dht_sensor_read(Sensor* self) {
         data->last_humidity = -1;
 
         // Se imprime un mensaje de error con el nombre y pin del sensor
-        ESP_LOGE(TAG, "Error leyendo DHT11 '%s' en GPIO %d: %d \n", self->name, data->gpio_num, res);
+       // ESP_LOGE(TAG, "Error leyendo DHT11 '%s' en GPIO %d: %d \n", self->name, data->gpio_num, res);
         return NULL;  // Retorna NULL indicando que la lectura falló
     }
     
@@ -90,9 +90,9 @@ static bool dht_sensor_publish(Sensor* self) {
     
     // Verificamos si la publicacion fue exitosa y lo registramos en el log
     if (published) {
-        ESP_LOGI(TAG, "Publicacion exitosa para sensor %s", self->name);
+        //ESP_LOGI(TAG, "Publicacion exitosa para sensor %s", self->name);
     } else {
-        ESP_LOGE(TAG, "Fallo en la publicacion para sensor %s", self->name);
+        //ESP_LOGE(TAG, "Fallo en la publicacion para sensor %s", self->name);
     }
 
     // Retorna true si se publico correctamente, false en caso contrario

@@ -16,8 +16,8 @@
 #define DISPENSER_TIEMPO_FRENADO_MS    20                   // Tiempo de frenado suave (ms)
 #define DISPENSER_TIEMPO_MAX_MOVIMIENTO_MS 1000              // Tiempo máximo permitido para un giro (ms)
 typedef struct {
-    char id[16];
-    time_t fecha_programada;
+    int id;
+    struct tm fecha_programada;
     bool dispensado;
     bool manual;
 } DispenserCompartment;

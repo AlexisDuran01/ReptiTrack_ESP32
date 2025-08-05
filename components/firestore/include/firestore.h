@@ -9,6 +9,8 @@
 #define FIRESTORE_BASE_URL_MAX_LEN 256
 #define FIRESTORE_MAX_RESPONSE_LEN 1024
 
+
+
 /**
  * @brief Estructura que almacena los IDs para Firestore
  */
@@ -117,4 +119,12 @@ esp_err_t firestore_overwrite_document(const char *path, const char *jsonPayload
  * @param max_len Tamaño máximo del buffer outResponse
  * @return esp_err_t Código de error ESP-IDF
  */
-esp_err_t firestore_update_fields(const char *path, const char *jsonPayload, char *outResponse, size_t max_len);
+esp_err_t firestore_update_document(const char *subpath, const char *jsonPayload, const char *updateMask, char *outResponse, size_t max_len);
+
+
+/**
+ * @brief Verifica si hay conectividad con Firestore y al menos un terrario
+ * 
+ * @return true si hay al menos un documento de terrario, false si falla o está vacío
+ */
+bool firestore_check_connectivity(void);

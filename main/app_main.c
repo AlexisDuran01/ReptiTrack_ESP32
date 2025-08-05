@@ -13,15 +13,18 @@
 #include "nvs_utils.h"
 #include "actuators_manager.h"
 #include "pzem004tv3.h"
+#include "rtc_time.h"
+
 
 
 // Esta es la función principal que se ejecuta al encender el esp32
 void app_main(void)
 {
+	rtc_time_init_timezone();
 
 	nvs_utils_init();
-	sensors_manager_init(); // Inicializa y registra los sensores
-	sensors_manager_start_read();  //  se encarga de mantener actualizados los datos
+	//sensors_manager_init(); // Inicializa y registra los sensores
+	//sensors_manager_start_read();  //  se encarga de mantener actualizados los datos
 	
     // Aquí se llama a la función que inicia el proceso de conexión Wi-Fi.
     // Esta función se encarga de todo lo necesario para que el dispositivo pueda conectarse a internet.

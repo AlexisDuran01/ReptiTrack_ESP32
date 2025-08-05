@@ -8,6 +8,7 @@
 #include "sensors_manager.h"
 #include "firestore.h"
 #include "actuators_manager.h"
+#include "soc/rtc.h"
 
 static const char *TAG = "conn_manager";  
 // TAG para usar en logs con ESP_LOG*, para identificar la fuente del mensaje en la consola.
@@ -59,35 +60,24 @@ static void wifi_services_init_task(void *pvParameter) {
         ESP_LOGI(TAG, "Conexion a internet OK");
         rtc_time_sync_with_timezone("America/Mexico_City"); // Sincroniza la hora local con el servidor NTP
         rtc_time_print_current();       
-        
+        rtc_time_init_timezone();
 
-      	 // Inicializar MQTT aquí:
+      	 // Inicializar MQTT
 		mqtt_cliente_init();
 		 
         firestore_init();
 	        
-	    actuators_manager_init();
-	    
-		actuators_manager_start_all();
-			
         
-
-		char *response = NULL;
-		size_t len = 0;
-		
-		if (firestore_is_initialized()) {
-		    esp_err_t err = firestore_get_document("terrarios", &response, &len);
-		    if (err == ESP_OK) {
-		        ESP_LOGI(TAG, "Respuesta Firestore (%d bytes): %s\n", (int)len, response);
-		        free(response);  // Liberar memoria para evitar fugas
-		    } else {
-		        ESP_LOGE(TAG, "Error leyendo documento Firestore: %s", esp_err_to_name(err));
-		    }
-		} else {
-		    ESP_LOGE(TAG, "Firestore no inicializado correctamente");
-		}
-
-
+	  // Verifica si hay al menos un terrario y guarda su ID
+	    if (firestore_check_connectivity()) {
+	        ESP_LOGI(TAG, "Firestore conectado y terrario ID guardado en NVS");
+	
+	        // Inicializar e iniciar actuadores
+	        actuators_manager_init();
+	        actuators_manager_start_all();
+	    } else {
+	        ESP_LOGW(TAG, "No se encontró ningún terrario. Actuadores NO iniciados.");
+	    }
 	   		 
     } else {
         ESP_LOGW(TAG, "No hay conexión a internet, no se puede sincronizar la hora ni verificar servicios");

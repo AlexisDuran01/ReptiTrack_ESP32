@@ -3,6 +3,7 @@
 #include "esp_http_client.h"               // Para hacer peticiones HTTP.
 #include "esp_system.h"                    // Funciones básicas del sistema ESP32.
 #include "cJSON.h"                         // Biblioteca para parsear JSON.
+#include <stdlib.h>
 #include <string.h>                        // Para funciones de manejo de cadenas como memcpy, strlen, etc.
 #include <time.h>                          // Para estructuras y funciones relacionadas con el tiempo.
 #include "nvs_utils.h"    					// Incluye utilidades personalizadas para simplificar el uso de NVS.
@@ -18,6 +19,14 @@ static const char *NVS_NAMESPACE = "rtc";
 // Define la clave específica dentro del namespace para el estado de sincronización
 static const char *NVS_KEY_SYNCED = "synced";
 
+ 
+ 
+void rtc_time_init_timezone(void) {
+   setenv("TZ", "CST6", 1);
+    tzset();
+}
+
+ 
  
 /**
  * @brief Consulta si el RTC ha sido sincronizado previamente.
@@ -332,6 +341,7 @@ esp_err_t rtc_time_sync_with_timezone(const char *timezone) {
     ESP_LOGI(TAG, "Hora sincronizada: %04d-%02d-%02d %02d:%02d:%02d",
              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+             
 
     // Devuelve ESP_OK para indicar que todo fue exitoso
     return ESP_OK;
@@ -492,40 +502,45 @@ static time_t my_timegm(struct tm *tm) {
  *         ESP_ERR_INVALID_ARG si los argumentos son inválidos o el formato es incorrecto,
  *         ESP_FAIL si la conversión a `time_t` falló.
  */
-esp_err_t rtc_time_parse_iso8601_string(const char *iso_str, time_t *out_time) {
-    // Verifica que los punteros no sean NULL, para evitar errores de acceso inválido
-    if (!iso_str || !out_time) return ESP_ERR_INVALID_ARG;
+esp_err_t rtc_time_parse_iso8601_to_tm(const char *iso_str, struct tm *out_tm) {
+    if (!iso_str || !out_tm) return ESP_ERR_INVALID_ARG;
 
-    // Inicializa una estructura tm a cero, que almacenará los componentes desglosados de la fecha/hora
+    size_t iso_len = strlen(iso_str);
+    if (iso_len < 19) return ESP_ERR_INVALID_ARG; // mínimo "YYYY-MM-DDTHH:MM:SS"
+
+    // Copiar solo la parte "YYYY-MM-DDTHH:MM:SS"
+    char buf[20];
+    memcpy(buf, iso_str, 19);
+    buf[19] = '\0';
+
+    // Cambiar 'T' por espacio para strptime
+    buf[10] = ' ';
+
     struct tm tm_val = {0};
+    if (!strptime(buf, "%Y-%m-%d %H:%M:%S", &tm_val)) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
-    // Verifica que la cadena tenga al menos 20 caracteres (lo mínimo para "YYYY-MM-DDTHH:MM:SS")
-    if (strlen(iso_str) < 20) return ESP_ERR_INVALID_ARG;
+    tm_val.tm_isdst = 0; // ignorar horario de verano en UTC
 
-    // Buffer temporal donde copiaremos solo la parte relevante de la fecha/hora, sin la zona horaria ni milisegundos
-    char buf[21];                          
-    memcpy(buf, iso_str, 19);   // Copia los primeros 19 caracteres ("YYYY-MM-DDTHH:MM:SS")
-    buf[19] = '\0';            // Añade el terminador nulo para tratar buf como string válido
+    // Convertir struct tm UTC a time_t (segundos desde epoch)
+    time_t t = my_timegm(&tm_val); // my_timegm debe comportarse como timegm
+    if (t == (time_t)-1) return ESP_FAIL;
 
-    buf[10] = ' ';             // Reemplaza la 'T' del formato ISO por un espacio para que strptime pueda entenderlo
-                              // Ejemplo: cambia "2025-07-26T14:15:30" a "2025-07-26 14:15:30"
+    // Inicializar zona horaria local (configura TZ y llama tzset)
+    rtc_time_init_timezone();
 
-    // Usa strptime para convertir el string a la estructura tm, con el formato esperado
-    // %Y = año (4 dígitos), %m = mes, %d = día, %H = hora (24h), %M = minutos, %S = segundos
-    if (!strptime(buf, "%Y-%m-%d %H:%M:%S", &tm_val)) return ESP_ERR_INVALID_ARG;
+    // Convertir time_t UTC a hora local
+    struct tm tm_local;
+    if (localtime_r(&t, &tm_local) == NULL) return ESP_FAIL;
 
-    // Indica que no se debe usar horario de verano (DST) para esta hora, ya que es UTC
-    tm_val.tm_isdst = 0;
+    // Copiar resultado al out_tm
+    *out_tm = tm_local;
 
-    // Convierte la estructura tm a time_t, interpretando que la hora está en UTC usando la función auxiliar
-    time_t t = my_timegm(&tm_val);
-    if (t == (time_t)-1) return ESP_FAIL;  // Retorna error si la conversión falla
-
-    // Guarda el resultado en la variable indicada por el puntero out_time
-    *out_time = t;
-
-    return ESP_OK;  // Indica éxito en la conversión
+    return ESP_OK;
 }
+
+
 
 
 /**

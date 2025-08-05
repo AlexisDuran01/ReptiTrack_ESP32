@@ -6,7 +6,7 @@
 #include <time.h>
 
 
-
+ void rtc_time_init_timezone(void);
 /**
  * @brief Sincroniza la hora local del ESP32 consultando un servidor de hora en línea (WorldTimeAPI).
  * 
@@ -67,7 +67,7 @@ esp_err_t rtc_time_get_current(time_t *out_time);
  * @return ESP_OK si fue convertido correctamente.
  *         ESP_ERR_INVALID_ARG si el formato es incorrecto o punteros inválidos.
  */
-esp_err_t rtc_time_parse_iso8601_string(const char *iso_str, time_t *out_time);
+esp_err_t rtc_time_parse_iso8601_to_tm(const char *iso_str, struct tm *out_tm);
 
 /**
  * @brief Consulta si el flag de sincronización de hora está activo en NVS.
