@@ -31,15 +31,16 @@ static void* pzem_read(Sensor* self) {
         data->last_values.frequency = -1;
         data->last_values.pf        = -1;
 
-        //ESP_LOGE(TAG, "Error leyendo PZEM '%s'", self->name);
+        ESP_LOGE(TAG, "Error leyendo PZEM '%s'", self->name);
         return NULL;
     }
-
+/*
     ESP_LOGI(TAG, "Vrms: %.1fV - Irms: %.3fA - P: %.1fW - E: %.2fWh", 
         data->last_values.voltage, 
         data->last_values.current, 
         data->last_values.power, 
         data->last_values.energy);
+        */
 
     return &data->last_values;
 }

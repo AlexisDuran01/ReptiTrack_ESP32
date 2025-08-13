@@ -23,8 +23,8 @@ void app_main(void)
 	rtc_time_init_timezone();
 
 	nvs_utils_init();
-	//sensors_manager_init(); // Inicializa y registra los sensores
-	//sensors_manager_start_read();  //  se encarga de mantener actualizados los datos
+	sensors_manager_init(); // Inicializa y registra los sensores
+	sensors_manager_start_read();  //  se encarga de mantener actualizados los datos
 	
     // Aquí se llama a la función que inicia el proceso de conexión Wi-Fi.
     // Esta función se encarga de todo lo necesario para que el dispositivo pueda conectarse a internet.

@@ -65,7 +65,7 @@ static void init_led_and_button(void) {
     };
     gpio_config(&io_conf_led);                   // Aplica la configuración al pin del LED
 
-    gpio_config_t io_conf_btn = {
+  gpio_config_t io_conf_btn = {
         .pin_bit_mask = (1ULL << PROV_BUTTON_GPIO), // Máscara de bits para seleccionar el pin del botón
         .mode = GPIO_MODE_INPUT,                 // Configura el pin como entrada
         .pull_up_en = GPIO_PULLUP_DISABLE,       // Desactiva resistencia pull-up
@@ -786,7 +786,7 @@ void my_wifi_prov_startup(void)
             .verifier_len = sec2_verifier_len       // Longitud del verificador
         };
 
-        const char *service_name = "ReptiTrack_BLE"; // Nombre del servicio BLE que verá el usuario en la app móvil
+        const char *service_name = "ReptiTrack_01"; // Nombre del servicio BLE que verá el usuario en la app móvil
         //const char *username = EXAMPLE_PROV_SEC2_USERNAME; // (opcional) Usuario para el provisioning
 
         // Inicia el proceso de provisioning BLE con seguridad SRP6a, usando los parámetros definidos y el nombre de servicio.

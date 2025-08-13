@@ -119,4 +119,7 @@ esp_err_t rtc_time_clear_synchronized(void);
  */
 esp_err_t rtc_time_get_formatted_readable(char *out_str, size_t max_len);
 
+time_t timegm(struct tm *tm);
+
+
 #endif // RTC_TIME_H

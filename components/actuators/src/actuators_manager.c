@@ -2,8 +2,9 @@
 #include "esp_log.h"
 #include <string.h>
 #include <stdlib.h>
+#include "rtc_time.h"             // Incluye funciones para sincronización y manejo del reloj RTC.
 
-#include "dispenser.h"  // Incluir aquí los actuadores que vas a registrar
+#include "dispenser/dispenser.h"  // Incluir aquí los actuadores que vas a registrar
 
 #define MAX_ACTUATORS 10
 #define TAG "ACTUATORS_MANAGER"
@@ -63,9 +64,11 @@ bool actuators_manager_register(Actuator* actuator) {
 // Crea y registra todos los actuadores disponibles
 bool actuators_manager_register_all(void) {
     bool alguno_registrado = false;
+    
+    rtc_time_sync_with_timezone("America/Mexico_City"); // Sincroniza la hora local con el servidor NTP
 
     // Crear y registrar dispenser (ejemplo)
-    Actuator* dispenser = dispenser_create(33, 25, 32, 18);
+    Actuator* dispenser = dispenser_create(25, 33, 32, 26);
     if (dispenser && actuators_manager_register(dispenser)) {
         alguno_registrado = true;
     }

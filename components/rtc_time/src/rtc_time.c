@@ -22,7 +22,7 @@ static const char *NVS_KEY_SYNCED = "synced";
  
  
 void rtc_time_init_timezone(void) {
-   setenv("TZ", "CST6", 1);
+    setenv("TZ", "UTC0", 1);
     tzset();
 }
 
@@ -163,60 +163,49 @@ esp_err_t rtc_time_clear_synchronized(void) {
  *
  * @return ESP_OK si fue exitoso, o un código de error (ESP_ERR_INVALID_ARG, ESP_FAIL, etc).
  */
-static esp_err_t parse_worldtimeapi_response(const char *json_str, struct tm *out_tm) {
-    // Verifica que los argumentos de entrada no sean NULL
-    if (!json_str || !out_tm) {
-        return ESP_ERR_INVALID_ARG;  // Retorna error si json_str o out_tm son inválidos
-    }
-
-    // Intenta parsear el JSON recibido usando cJSON
-    cJSON *root = cJSON_Parse(json_str);
+esp_err_t parse_worldtimeapi_response(const char *json, struct tm *out_tm)
+{
+    const char *TAG = "rtc_time";
+    cJSON *root = cJSON_Parse(json);
     if (!root) {
-        ESP_LOGE(TAG, "Error parseando JSON");  // Log de error si no se pudo interpretar el JSON
+        ESP_LOGE(TAG, "No se pudo parsear el JSON");
         return ESP_FAIL;
     }
 
-    // Busca el campo "datetime" en el JSON (ejemplo: "2025-07-26T14:15:30.123456+00:00")
-    const cJSON *datetime = cJSON_GetObjectItem(root, "datetime");
+    // Usar el campo "utc_datetime"
+    const cJSON *datetime = cJSON_GetObjectItem(root, "utc_datetime");
     if (!datetime || !cJSON_IsString(datetime)) {
-        ESP_LOGE(TAG, "Campo 'datetime' no encontrado o no es string");
-        cJSON_Delete(root);  // Libera memoria del objeto JSON antes de salir
+        ESP_LOGE(TAG, "Campo 'utc_datetime' no encontrado o no es string");
+        cJSON_Delete(root);
         return ESP_FAIL;
     }
 
-    const char *dt_str = datetime->valuestring;  // Apunta al string que contiene la fecha/hora completa
+    const char *dt_str = datetime->valuestring;
 
-    // Verifica que la longitud mínima del string sea 19 caracteres ("YYYY-MM-DDTHH:MM:SS")
+    // Espera formato: "YYYY-MM-DDTHH:MM:SS"
     if (strlen(dt_str) < 19) {
-        ESP_LOGE(TAG, "Formato datetime inesperado");
+        ESP_LOGE(TAG, "Formato utc_datetime inesperado");
         cJSON_Delete(root);
         return ESP_FAIL;
     }
 
-    // Creamos un buffer temporal para copiar los primeros 19 caracteres (hasta segundos)
-    char buf[20];
-    memcpy(buf, dt_str, 19);  // Copia solo "YYYY-MM-DDTHH:MM:SS"
-    buf[19] = '\0';           // Asegura que la cadena esté terminada correctamente con '\0'
+    memset(out_tm, 0, sizeof(struct tm));
+    int parsed = sscanf(dt_str, "%4d-%2d-%2dT%2d:%2d:%2d",
+                        &out_tm->tm_year, &out_tm->tm_mon, &out_tm->tm_mday,
+                        &out_tm->tm_hour, &out_tm->tm_min, &out_tm->tm_sec);
 
-    // Reemplaza la letra 'T' por un espacio para que sea compatible con strptime
-    // Ej: "2025-07-26 14:15:30"
-    buf[10] = ' ';
-
-    // Convierte el string de fecha/hora a una estructura tm usando strptime
-    // Este paso es sensible al formato: "%Y-%m-%d %H:%M:%S"
-    if (!strptime(buf, "%Y-%m-%d %H:%M:%S", out_tm)) {
-        ESP_LOGE(TAG, "Error parseando fecha con strptime");
+    if (parsed != 6) {
+        ESP_LOGE(TAG, "No se pudo extraer la fecha/hora de utc_datetime");
         cJSON_Delete(root);
         return ESP_FAIL;
     }
 
-    // Libera memoria del objeto JSON una vez terminado el parseo
+    out_tm->tm_year -= 1900;
+    out_tm->tm_mon -= 1;
+
     cJSON_Delete(root);
-
-    // Devuelve ESP_OK si todo salió bien
     return ESP_OK;
 }
-
 
 /**
  * @brief Sincroniza la hora del ESP32 usando un servidor en línea (WorldTimeAPI).
@@ -271,7 +260,7 @@ esp_err_t rtc_time_sync_with_timezone(const char *timezone) {
     // Obtiene el código de estado HTTP (ej. 200 OK)
     int status = esp_http_client_get_status_code(client);
     if (status != 200) {
-        ESP_LOGE(TAG, "Código de respuesta HTTP inesperado: %d", status);
+        ESP_LOGE(TAG, "Codigo de respuesta HTTP inesperado: %d", status);
         esp_http_client_cleanup(client); // Cierra el cliente aunque sea error
         return ESP_FAIL;
     }
@@ -372,8 +361,8 @@ esp_err_t rtc_time_print_current(void) {
     time(&now);  // Equivalente a: now = time(NULL);
 
     // Convierte la hora actual a una estructura `struct tm` con los componentes separados (año, mes, día, etc).
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);  // Usa versión segura de localtime (reentrante).
+	struct tm timeinfo;
+	gmtime_r(&now, &timeinfo);
 
     // Imprime la hora actual en formato legible: "YYYY-MM-DD HH:MM:SS"
     ESP_LOGI(TAG, "%04d-%02d-%02d %02d:%02d:%02d",
@@ -430,73 +419,29 @@ esp_err_t rtc_time_get_current(time_t *out_time) {
 }
 
 
-
-
-// -------------------------- FUNCIÓN AUXILIAR: mktime en UTC --------------------------
-
-/**
- * @brief Convierte una estructura `struct tm` que representa una fecha/hora en UTC
- *        a un valor `time_t` (segundos desde Epoch).
- *
- * Esta función sirve para convertir una fecha y hora expresada en tiempo UTC (Tiempo Universal Coordinado)
- * a un valor numérico que representa la cantidad de segundos transcurridos desde el 1 de enero de 1970
- * a las 00:00:00 UTC (conocido como Epoch Unix o época Unix).
- *
- * La función estándar `mktime()` interpreta la fecha/hora dada como hora local, lo que puede generar errores
- * si los datos están en UTC, ya que no considera la zona horaria. `my_timegm()` simula la función
- * `timegm()`, que convierte `struct tm` en UTC a `time_t`, ajustando temporalmente la zona horaria del sistema.
- *
- * @param tm Puntero a una estructura `struct tm` que contiene la fecha y hora en UTC.
- *
- * @return El tiempo en segundos desde la Epoch Unix, es decir, desde 1970-01-01 00:00:00 UTC.
- */
-static time_t my_timegm(struct tm *tm) {
-    // Guarda la zona horaria actual del sistema. La zona horaria
-    // define el desfase respecto a UTC que se aplica para interpretar las horas locales.
-    // Se obtiene leyendo la variable de entorno "TZ" del sistema operativo.
-    const char *tz = getenv("TZ");
-
-    // Cambia temporalmente la zona horaria a UTC (Tiempo Universal Coordinado),
-    // que es el estándar global de referencia para la hora y no tiene desfase.
-    // "UTC0" indica que no hay desplazamiento horario respecto a UTC.
-    // El tercer parámetro '1' indica que se sobrescribe el valor actual de "TZ".
-    setenv("TZ", "UTC0", 1);
-
-    // Aplica el cambio de la variable TZ para que el sistema reconozca la nueva zona horaria.
-    // Esto asegura que las funciones de tiempo interpreten la hora como UTC.
+time_t timegm(struct tm *tm) {
+    char *tz = getenv("TZ");
+    setenv("TZ", "", 1); // UTC
     tzset();
-
-    // Convierte la estructura tm a un valor de tipo time_t, interpretando que la hora es UTC.
-    // time_t es un entero que cuenta segundos desde la Epoch Unix (1970-01-01 00:00:00 UTC).
-    time_t t = mktime(tm);
-
-    // Restaura la zona horaria original si existía previamente.
-    // Si la variable TZ estaba definida antes, se vuelve a colocar su valor original.
+    time_t ret = mktime(tm);
     if (tz)
         setenv("TZ", tz, 1);
     else
-        // Si antes no había zona horaria definida, se elimina la variable TZ.
         unsetenv("TZ");
-
-    // Aplica nuevamente el cambio para que el sistema vuelva a usar la configuración original de zona horaria.
     tzset();
-
-    // Retorna el valor calculado de segundos desde Epoch Unix en base a la fecha/hora UTC proporcionada.
-    return t;
+    return ret;
 }
 
-
 /**
- * @brief Convierte una cadena de fecha y hora en formato ISO 8601 a un valor `time_t` en UTC.
+ * @brief Convierte una cadena de fecha y hora en formato ISO 8601 a una estructura `struct tm` en UTC.
  *
  * Esta función recibe una cadena con una fecha/hora en formato ISO 8601 (ejemplo: "2025-07-26T14:15:30Z"),
  * que representa la fecha y hora en Tiempo Universal Coordinado (UTC). Extrae la parte relevante,
- * la convierte a una estructura `struct tm` y luego la transforma a un timestamp `time_t`
- * (segundos desde Epoch Unix) asumiendo que la hora es UTC.
+ * la convierte a una estructura `struct tm` en UTC.
  *
  * @param iso_str Cadena con la fecha/hora en formato ISO 8601. Debe contener al menos
  *                "YYYY-MM-DDTHH:MM:SS" y terminar con 'Z' o incluir zona UTC.
- * @param out_time Puntero a variable `time_t` donde se almacenará el resultado.
+ * @param out_tm Puntero a variable `struct tm` donde se almacenará el resultado en UTC.
  *
  * @return ESP_OK si la conversión fue exitosa,
  *         ESP_ERR_INVALID_ARG si los argumentos son inválidos o el formato es incorrecto,
@@ -524,24 +469,14 @@ esp_err_t rtc_time_parse_iso8601_to_tm(const char *iso_str, struct tm *out_tm) {
     tm_val.tm_isdst = 0; // ignorar horario de verano en UTC
 
     // Convertir struct tm UTC a time_t (segundos desde epoch)
-    time_t t = my_timegm(&tm_val); // my_timegm debe comportarse como timegm
+    time_t t = timegm(&tm_val); // Usa timegm estándar
     if (t == (time_t)-1) return ESP_FAIL;
 
-    // Inicializar zona horaria local (configura TZ y llama tzset)
-    rtc_time_init_timezone();
-
-    // Convertir time_t UTC a hora local
-    struct tm tm_local;
-    if (localtime_r(&t, &tm_local) == NULL) return ESP_FAIL;
-
-    // Copiar resultado al out_tm
-    *out_tm = tm_local;
+    // Copiar resultado UTC al out_tm usando gmtime_r
+    if (gmtime_r(&t, out_tm) == NULL) return ESP_FAIL;
 
     return ESP_OK;
 }
-
-
-
 
 /**
  * @brief Devuelve la hora actual del RTC formateada como una cadena legible.
@@ -581,8 +516,8 @@ esp_err_t rtc_time_get_formatted_readable(char *out_str, size_t max_len)
     }
 
     // Convertimos time_t a estructura tm (desglosada en año, mes, día, etc.)
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
+	struct tm timeinfo;
+	gmtime_r(&now, &timeinfo);
 
     // Formateamos la fecha y hora en el buffer de salida
     // Formato: "YYYY-MM-DD HH:MM:SS" (ej: 2025-07-31 21:03:00)

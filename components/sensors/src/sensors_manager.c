@@ -77,67 +77,60 @@ esp_err_t read_esp_id_from_nvs(char* esp_id_out, size_t max_len) {
 // Función interna: sensors_manager_register_all
 // Crea y registra todos los sensores definidos en el sistema.
 // -------------------------------------------------------------------
+// -------------------------------------------------------------------
 bool sensors_manager_register_all(void) {
-	
-	
-	 char esp_id[ESP_ID_MAX_LEN] = {0};
-	
-	esp_err_t err = read_esp_id_from_nvs(esp_id, sizeof(esp_id));
+
+    char esp_id[ESP_ID_MAX_LEN] = {0};
+
+    esp_err_t err = read_esp_id_from_nvs(esp_id, sizeof(esp_id));
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "El proceso de aprovisionamiento Wi-Fi no ha iniciado");
         return false;
     }
-    
-    
+
+    // Código PZEM siempre activo
+    pzem_setup_t pzConf = {
+        .pzem_uart   = UART_NUM_2,
+        .pzem_rx_pin = GPIO_NUM_16,
+        .pzem_tx_pin = GPIO_NUM_17,
+        .pzem_addr   = PZ_DEFAULT_ADDRESS,
+    };
+    Sensor* pzem = pzem_sensor_create("pzem004", &pzConf);
+    if (pzem) {
+        pzem->init(pzem); // Inicializa el UART usando PzemInit internamente
+        sensors_manager_register(pzem);
+    } else {
+        ESP_LOGE(TAG, "No se pudo crear el sensor PZEM");
+    }
+
+    /*
     if (strcmp(esp_id, "esp01") == 0) {
-		
+
         ESP_LOGI(TAG, "Registrando sensores para esp_id esp01");
+
+        // Ejemplo: Crear y registrar un sensor DHT11 en GPIO 4
         
-	 // Ejemplo: Crear y registrar un sensor DHT11 en GPIO 4
-	    
-		/*
-		 * DHT_TYPE_DHT11 se puede usar porque dht_sensor.h incluye dht.h,
-		 * por lo que los simbolos de dht.h quedan visibles indirectamente
-		 * Esto se llama inclusion transitiva: una cabecera expone definiciones
-		 * de otra que incluye, sin necesidad de incluirla directamente
-		 
-		 // Un enum es una lista de nombres que representan números enteros
-		 // DHT_TYPE_DHT11 es uno de esos nombres dentro del enum dht_sensor_type_t
-		 
-		
-	    
-		 */
-		 
-		 Sensor* dht11 = dht_sensor_create("dht01", 4, DHT_TYPE_DHT11);
-	    if (dht11) {
-	        sensors_manager_register(dht11);
-	    } else {
-	        ESP_LOGE(TAG, "No se pudo crear el sensor DHT11");
-	    }
-		 
-			pzem_setup_t pzConf = {
-			    .pzem_uart   = UART_NUM_2,
-			    .pzem_rx_pin = GPIO_NUM_16,
-			    .pzem_tx_pin = GPIO_NUM_17,
-			    .pzem_addr   = PZ_DEFAULT_ADDRESS,
-			};
-			Sensor* pzem = pzem_sensor_create("pzem004", &pzConf);
-			if (pzem) {
-			    pzem->init(pzem); // Inicializa el UART usando PzemInit internamente
-			    sensors_manager_register(pzem);
-			} else {
-			    ESP_LOGE(TAG, "No se pudo crear el sensor PZEM");
-			}
-	
-		
-	    return true;
-        
-    } 
-    else if (strcmp(esp_id, "esp02") == 0) {
-		
-		
+         * DHT_TYPE_DHT11 se puede usar porque dht_sensor.h incluye dht.h,
+         * por lo que los simbolos de dht.h quedan visibles indirectamente
+         * Esto se llama inclusion transitiva: una cabecera expone definiciones
+         * de otra que incluye, sin necesidad de incluirla directamente
+
+         // Un enum es una lista de nombres que representan números enteros
+         // DHT_TYPE_DHT11 es uno de esos nombres dentro del enum dht_sensor_type_t
+
+            Sensor* dht11 = dht_sensor_create("dht01", 4, DHT_TYPE_DHT11);
+            if (dht11) {
+                sensors_manager_register(dht11);
+            } else {
+                ESP_LOGE(TAG, "No se pudo crear el sensor DHT11");
+            }
+
+        return true;
+
+    } else if (strcmp(esp_id, "esp02") == 0) {
+
         ESP_LOGI(TAG, "Registrando sensores para esp_id esp02");
-        
+
         
         Sensor* dht22 = dht_sensor_create("dht22_01", 5, DHT_TYPE_AM2301);
         if (dht22) {
@@ -146,16 +139,18 @@ bool sensors_manager_register_all(void) {
             ESP_LOGE(TAG, "Error creando sensor DHT22");
         }
         
+
         return true;
-    } 
-    else {
+    } else {
         ESP_LOGW(TAG, "esp_id desconocido: %s", esp_id);
         return false;
     }
-	
-	
+    */
 
+    // Si quieres que la función siempre retorne true después de configurar PZEM y sin usar sensores específicos, puedes ponerlo aquí:
+    return true;
 }
+
 
 
 // -------------------------------------------------------------------

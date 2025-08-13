@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "app-template",
-    "project_version":    "de2b309-dirty",
+    "project_version":    "f0ca201-dirty",
     "project_path":       "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32",
     "idf_path":           "D:/ESP32/Espressif/frameworks/esp-idf-v5.3.1",
     "build_dir":          "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build",
@@ -40,8 +40,8 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/build/esp-idf/actuators/libactuators.a",
-            "sources": [ "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/actuators/src/actuators_manager.c", "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/actuators/src/dispenser.c" ],
-            "include_dirs": [ "include" ]
+            "sources": [ "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/actuators/src/actuators_manager.c", "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/actuators/src/dispenser/dispenser.c", "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/actuators/src/dispenser/dispenser_motor.c", "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/actuators/src/dispenser/dispenser_firestore.c", "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/actuators/src/dispenser/dispenser_utils.c", "D:/Universidad/9-Cuatrimestre/Proyecto/IOT/ESP32/components/actuators/src/dispenser/dispenser_led.c" ],
+            "include_dirs": [ "include", "include/dispenser" ]
         },
         "app_trace": {
             "alias": "idf::app_trace",
@@ -2998,7 +2998,7 @@
             "priv_reqs": [],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include" ]
+            "include_dirs": [ "include", "include/dispenser" ]
         },
         "conn_manager": {
             "alias": "idf::conn_manager",
