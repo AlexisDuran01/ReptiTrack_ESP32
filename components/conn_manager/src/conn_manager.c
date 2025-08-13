@@ -61,7 +61,7 @@
 	        ESP_LOGI(TAG, "Conexion a internet OK");
 	        rtc_time_sync_with_timezone("America/Mexico_City"); // Sincroniza la hora local con el servidor NTP
 	        rtc_time_print_current();       
-	        rtc_time_init_timezone();
+	      //  rtc_time_init_timezone();
 	
 	      	 // Inicializar MQTT
 			mqtt_cliente_init();

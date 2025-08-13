@@ -9,6 +9,9 @@
 
 #define TAG "dispenser_utils"
 
+#define DISPENSADOR_NVS_NAMESPACE "dispensador"
+
+
 bool get_terrario_id_from_nvs(char *terrario_id_buf, size_t buf_len) {
     if (!terrario_id_buf || buf_len == 0) return false;
 
@@ -129,4 +132,29 @@ bool dispenser_parse_compartments_json(const char* json_str, DispenserCompartmen
     cJSON_Delete(root);
 
     return true;
+}
+
+
+bool dispenser_nvs_guardar_dispensado(int compartimiento_id) {
+    char key[16];
+    snprintf(key, sizeof(key), "disp_%d", compartimiento_id);
+    uint8_t val = 1;
+    esp_err_t err = nvs_utils_save_blob(DISPENSADOR_NVS_NAMESPACE, key, &val, sizeof(val));
+    return (err == ESP_OK);
+}
+
+bool dispenser_nvs_ya_dispensado(int compartimiento_id) {
+    char key[16];
+    snprintf(key, sizeof(key), "disp_%d", compartimiento_id);
+    uint8_t val = 0;
+    size_t actual_len = 0;
+    esp_err_t err = nvs_utils_load_blob(DISPENSADOR_NVS_NAMESPACE, key, &val, sizeof(val), &actual_len);
+    return (err == ESP_OK && val == 1 && actual_len == 1);
+}
+
+bool dispenser_nvs_limpiar_dispensado(int compartimiento_id) {
+    char key[16];
+    snprintf(key, sizeof(key), "disp_%d", compartimiento_id);
+    esp_err_t err = nvs_utils_erase_key(DISPENSADOR_NVS_NAMESPACE, key);
+    return (err == ESP_OK);
 }

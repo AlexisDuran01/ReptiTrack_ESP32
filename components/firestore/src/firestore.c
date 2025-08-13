@@ -303,9 +303,9 @@ esp_err_t firestore_get_document(const char *subpath, char **outResponse, size_t
 
     // Inicializa estructura para acumular la respuesta HTTP
     http_response_t response = {
-        .buffer = malloc(512),    // Reserva 512 bytes inicialmente
+        .buffer = malloc(2048),    // Reserva 512 bytes inicialmente
         .length = 0,              // Aún no hay datos
-        .capacity = 512           // Capacidad inicial
+        .capacity = 2048           // Capacidad inicial
     };
 
     // Verifica si hubo éxito al reservar memoria
@@ -380,9 +380,9 @@ esp_err_t firestore_create_document(const char *subpath, const char *jsonPayload
     if (!full_url) return ESP_FAIL;
 
     http_response_t response = {
-        .buffer = malloc(512),
+        .buffer = malloc(2048),
         .length = 0,
-        .capacity = 512
+        .capacity = 2048
     };
 
     if (!response.buffer) {
@@ -458,9 +458,9 @@ esp_err_t firestore_overwrite_document(const char *subpath, const char *jsonPayl
 
     // Preparar buffer para respuesta
     http_response_t response = {
-        .buffer = malloc(512),
+        .buffer = malloc(2048),
         .length = 0,
-        .capacity = 512
+        .capacity = 2048
     };
     if (!response.buffer) {
         free(full_url);
@@ -545,9 +545,9 @@ esp_err_t firestore_update_document(const char *subpath, const char *jsonPayload
 
     // Preparar buffer para respuesta
     http_response_t response = {
-        .buffer = malloc(512),
+        .buffer = malloc(2048),
         .length = 0,
-        .capacity = 512
+        .capacity = 2048
     };
     if (!response.buffer) {
         free(full_url);

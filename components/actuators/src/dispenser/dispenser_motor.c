@@ -8,6 +8,7 @@
 #include <freertos/semphr.h>
 #include "esp_timer.h"
 #include "dispenser/dispenser_led.h"
+#include "dispenser/dispenser_utils.h"
 
 #define TAG "dispenser_motor"
 
@@ -19,6 +20,8 @@ extern SemaphoreHandle_t g_fetch_pause_semaphore;
 extern bool ronda_finalizada;
 bool firestore_fetch_update_dispensed(struct DispenserActuator* self, int compartment_id);
 
+#define FIRESTORE_UPDATE_RETRIES 5
+#define FIRESTORE_UPDATE_RETRY_DELAY_MS 500
 
 
 // Implementación de start_motor
@@ -75,7 +78,7 @@ void dispenser_motor_stop(void* self_ptr) {
                 // Tomar semáforo para pausar fetch concurrente
                 bool sem_taken = false;
                 if (g_fetch_pause_semaphore != NULL) {
-                    if (xSemaphoreTake(g_fetch_pause_semaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
+    				if (xSemaphoreTake(g_fetch_pause_semaphore, pdMS_TO_TICKS(10000)) == pdTRUE) { // <-- Aumenta el timeout aquí
                         ESP_LOGI(TAG, "fetch_task bloqueada para actualizacion Firestore");
                         sem_taken = true;
                     } else {
@@ -83,8 +86,20 @@ void dispenser_motor_stop(void* self_ptr) {
                     }
                 }
 
-             bool resultado = firestore_fetch_update_dispensed(self, compart_id_real);
-			if (!resultado) {
+	
+				bool resultado = false;
+				for (int intento = 1; intento <= FIRESTORE_UPDATE_RETRIES; intento++) {
+				    resultado = firestore_fetch_update_dispensed(self, compart_id_real);
+				    if (resultado) {
+				        break;
+				    } else {
+				        ESP_LOGW(TAG, "Reintento %d/%d: Error actualizando Firestore para compartimiento ID %d", 
+				                 intento, FIRESTORE_UPDATE_RETRIES, compart_id_real);
+				        vTaskDelay(pdMS_TO_TICKS(FIRESTORE_UPDATE_RETRY_DELAY_MS));
+				    }
+				}			
+				
+				if (!resultado) {
 			    ESP_LOGE(TAG, "Error actualizando Firestore para compartimiento ID %d", compart_id_real);
 			    dispenser_led_set_synced(false); // LED apagado por posible error de sincronización
 			} else {
@@ -107,6 +122,7 @@ void dispenser_motor_stop(void* self_ptr) {
 			                tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
 			                tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
 			            hora_valida = true;
+			           // dispenser_nvs_limpiar_dispensado(compart_id_real);
 			            dispenser_led_set_synced(true); // LED encendido fijo si la hora es válida
 			        }
 			    }

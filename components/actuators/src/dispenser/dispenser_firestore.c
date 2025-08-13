@@ -263,7 +263,7 @@ bool dispenser_actuator_fetch(Actuator* actuator) {
         return false;
     }
 
-    if (xSemaphoreTake(g_compartimientos_mutex, pdMS_TO_TICKS(100))) {
+    if (xSemaphoreTake(g_compartimientos_mutex, pdMS_TO_TICKS(1000))) {
         g_compartimientos_global = new_compartments;
         xSemaphoreGive(g_compartimientos_mutex);
         ESP_LOGI(TAG, "Compartimientos actualizados desde Firestore");

@@ -57,6 +57,13 @@ void check_scheduled_compartments(DispenserActuator* dispenser) {
         if (comp->dispensado) {
             continue; // Ignorar dispensados
         }
+        
+        /*
+        if (dispenser_nvs_ya_dispensado(comp->id)) {
+		    ESP_LOGW(TAG, "Compartimiento %d ya fue dispensado (NVS), se omite acción física.", comp->id);
+		    continue;
+		}
+		*/
 
         bool dispensar = false;
 
@@ -105,10 +112,15 @@ void check_scheduled_compartments(DispenserActuator* dispenser) {
 			
 			ESP_LOGI(TAG, "\n\n");	
 
-			
+		    if (xSemaphoreTake(g_compartimientos_mutex, pdMS_TO_TICKS(100))) {
+		        g_compartimientos_global.compartments[comp->id - 1].dispensado = true; 
+		        xSemaphoreGive(g_compartimientos_mutex);
+		    }
+
             dispenser->compartimientoActual = i;
             dispenser->aspaDetectada = false;
             dispenser->tiempoInicioMovimiento = esp_timer_get_time() / 1000;
+        //    dispenser_nvs_guardar_dispensado(comp->id);
 
             if (dispenser->start_motor) {
                 dispenser->enMovimiento = true;
@@ -128,9 +140,7 @@ static void fetch_task(void* pvParameter) {
     DispenserActuator* self = (DispenserActuator*) pvParameter;
     while (1) {
         if (xSemaphoreTake(g_fetch_pause_semaphore, 0) == pdTRUE) {
-            if (!dispenser_actuator_fetch((Actuator*)self)) {
-                ESP_LOGW(TAG, "dispenser_actuator_fetch fallo");
-            }
+            dispenser_actuator_fetch((Actuator*)self);
             xSemaphoreGive(g_fetch_pause_semaphore);
         }
         vTaskDelay(pdMS_TO_TICKS(2100));
